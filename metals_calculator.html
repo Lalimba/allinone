@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gold & Silver Calculator — Obsession Trading</title>
+  <style>
+    :root{
+      --bg1:#070A12;
+      --bg2:#0C1230;
+      --card:#0e1636cc;
+      --card2:#0b1330cc;
+      --text:#e9edff;
+      --muted:#b7c0ffcc;
+      --accent:#8cffea;
+      --accent2:#a48bff;
+      --danger:#ff5f87;
+      --ok:#7CFF9B;
+      --line:#ffffff1a;
+      --shadow: 0 18px 60px rgba(0,0,0,.55);
+      --radius: 18px;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text);
+      background:
+        radial-gradient(1100px 800px at 10% 15%, rgba(164,139,255,.25), transparent 55%),
+        radial-gradient(900px 700px at 85% 20%, rgba(140,255,234,.20), transparent 55%),
+        radial-gradient(900px 700px at 70% 90%, rgba(255,95,135,.12), transparent 60%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      overflow-x:hidden;
+    }
+
+    /* fantasy shapes */
+    .orb, .orb2, .ring, .spark{
+      position:fixed;
+      pointer-events:none;
+      filter: blur(0.2px);
+      z-index:0;
+      opacity:.9;
+    }
+    .orb{
+      width:420px;height:420px;
+      left:-120px; top:110px;
+      background: radial-gradient(circle at 30% 30%, rgba(140,255,234,.55), rgba(164,139,255,.15) 45%, transparent 70%);
+      border-radius:50%;
+      mix-blend-mode: screen;
+      animation: floaty 10s ease-in-out infinite;
+    }
+    .orb2{
+      width:520px;height:520px;
+      right:-180px; top:40px;
+      background: radial-gradient(circle at 40% 30%, rgba(164,139,255,.60), rgba(140,255,234,.12) 52%, transparent 72%);
+      border-radius:50%;
+      mix-blend-mode: screen;
+      animation: floaty 12s ease-in-out infinite reverse;
+    }
+    .ring{
+      width:520px;height:520px;
+      left:55%; top:65%;
+      transform: translate(-50%,-50%) rotate(16deg);
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow: 0 0 0 1px rgba(140,255,234,.10) inset, 0 0 40px rgba(164,139,255,.12);
+      background:
+        radial-gradient(circle at 50% 50%, transparent 58%, rgba(140,255,234,.10) 59%, transparent 62%),
+        radial-gradient(circle at 50% 50%, transparent 67%, rgba(164,139,255,.10) 68%, transparent 71%);
+      opacity:.55;
+      animation: spin 22s linear infinite;
+    }
+    .spark{
+      width:2px;height:2px;
+      left:18%; top:78%;
+      box-shadow:
+        20px -18px 0 0 rgba(140,255,234,.75),
+        110px -40px 0 0 rgba(164,139,255,.65),
+        210px -6px 0 0 rgba(255,255,255,.55),
+        290px -70px 0 0 rgba(140,255,234,.65),
+        360px -24px 0 0 rgba(255,95,135,.50);
+      animation: twinkle 3.6s ease-in-out infinite;
+      opacity:.9;
+    }
+    @keyframes floaty{
+      0%,100%{ transform: translateY(0px); }
+      50%{ transform: translateY(-18px); }
+    }
+    @keyframes spin{
+      from{ transform: translate(-50%,-50%) rotate(16deg); }
+      to{ transform: translate(-50%,-50%) rotate(376deg); }
+    }
+    @keyframes twinkle{
+      0%,100%{ opacity:.5; }
+      50%{ opacity:1; }
+    }
+
+    .wrap{
+      position:relative;
+      z-index:1;
+      max-width:1100px;
+      margin:0 auto;
+      padding:34px 18px 56px;
+    }
+
+    header{
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+
+    .brand{
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+    .logo{
+      width:44px;height:44px;border-radius:14px;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(140,255,234,.9), rgba(164,139,255,.55) 45%, rgba(12,18,48,.2) 75%),
+        linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,0));
+      border:1px solid rgba(255,255,255,.16);
+      box-shadow: 0 14px 40px rgba(0,0,0,.35);
+      position:relative;
+    }
+    .logo:after{
+      content:"";
+      position:absolute;
+      inset:10px;
+      border-radius:12px;
+      border:1px dashed rgba(255,255,255,.22);
+      opacity:.7;
+    }
+    h1{
+      margin:0;
+      font-size:22px;
+      letter-spacing:.2px;
+      line-height:1.2;
+    }
+    .sub{
+      margin:4px 0 0;
+      color:var(--muted);
+      font-size:13px;
+      max-width:620px;
+    }
+
+    .pillbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:flex-end;
+    }
+    .pill{
+      padding:9px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      backdrop-filter: blur(8px);
+      color:var(--muted);
+      font-size:12px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      box-shadow: 0 10px 24px rgba(0,0,0,.2);
+    }
+    .dot{
+      width:8px;height:8px;border-radius:50%;
+      background: linear-gradient(180deg, var(--accent), var(--accent2));
+      box-shadow: 0 0 16px rgba(140,255,234,.55);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap:16px;
+      margin-top:14px;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns:1fr; }
+      .pillbar{ justify-content:flex-start; }
+    }
+
+    .card{
+      border-radius: var(--radius);
+      border:1px solid rgba(255,255,255,.14);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+    .card:before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background: radial-gradient(700px 300px at 10% 0%, rgba(140,255,234,.10), transparent 60%),
+                  radial-gradient(700px 300px at 90% 0%, rgba(164,139,255,.10), transparent 60%);
+      pointer-events:none;
+      opacity: .9;
+    }
+    .card-body{
+      position:relative;
+      padding:16px;
+    }
+    .card h2{
+      margin:0 0 8px;
+      font-size:15px;
+      letter-spacing:.2px;
+      color:#f1f3ff;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .badge{
+      font-size:11px;
+      color:rgba(255,255,255,.85);
+      border:1px solid rgba(255,255,255,.14);
+      padding:4px 8px;
+      border-radius:999px;
+      background: rgba(255,255,255,.06);
+    }
+
+    .row{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    @media (max-width: 560px){
+      .row{ grid-template-columns:1fr; }
+    }
+
+    label{
+      display:block;
+      font-size:12px;
+      color:var(--muted);
+      margin:10px 0 6px;
+    }
+    input, select{
+      width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(7,10,18,.40);
+      color:var(--text);
+      outline:none;
+      box-shadow: 0 10px 24px rgba(0,0,0,.20) inset;
+    }
+    input:focus, select:focus{
+      border-color: rgba(140,255,234,.55);
+      box-shadow: 0 0 0 4px rgba(140,255,234,.14);
+    }
+    .hint{
+      margin:8px 0 0;
+      color:rgba(183,192,255,.82);
+      font-size:12px;
+      line-height:1.35;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:14px;
+    }
+    button{
+      border:none;
+      border-radius: 14px;
+      padding:12px 14px;
+      color:#06101a;
+      font-weight:700;
+      cursor:pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 14px 35px rgba(140,255,234,.16), 0 14px 35px rgba(164,139,255,.14);
+      transition: transform .08s ease, filter .15s ease;
+    }
+    button:active{ transform: translateY(1px) scale(.99); }
+    .ghost{
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow: none;
+      font-weight:600;
+    }
+
+    .results{
+      margin-top:14px;
+      padding:14px;
+      border-radius: 16px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+    }
+    .kpi{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .kpi .big{
+      font-size:26px;
+      font-weight:900;
+      letter-spacing:.2px;
+    }
+    .kpi .small{
+      font-size:12px;
+      color:var(--muted);
+    }
+    .kpi .tag{
+      font-size:12px;
+      color: rgba(255,255,255,.9);
+      border:1px solid rgba(255,255,255,.14);
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(0,0,0,.12);
+    }
+
+    .divider{
+      height:1px;
+      background: rgba(255,255,255,.12);
+      margin:12px 0;
+    }
+
+    .mini{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    .mini .box{
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
+    }
+    .mini .box .lbl{
+      font-size:12px;
+      color: var(--muted);
+      margin-bottom:6px;
+    }
+    .mini .box .val{
+      font-size:16px;
+      font-weight:800;
+    }
+
+    .foot{
+      margin-top:12px;
+      font-size:12px;
+      color: rgba(183,192,255,.78);
+      line-height:1.4;
+    }
+
+    /* Obsession Trading panel */
+    .ot-title{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      margin-bottom:6px;
+    }
+    .chip{
+      font-size:11px;
+      padding:5px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.88);
+    }
+    .note{
+      font-size:12px;
+      color: rgba(183,192,255,.84);
+      line-height:1.45;
+      margin-top:10px;
+    }
+    .warn{
+      color: rgba(255,95,135,.95);
+      font-weight:700;
+    }
+    .ok{
+      color: rgba(124,255,155,.95);
+      font-weight:700;
+    }
+  </style>
+</head>
+<body>
+  <div class="orb"></div>
+  <div class="orb2"></div>
+  <div class="ring"></div>
+  <div class="spark"></div>
+
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>Gold & Silver Calculator</h1>
+          <p class="sub">Enter the spot price per <b>troy ounce</b>, choose purity (gold: karat / silver: %), and get <b>per gram</b> values. Styled for your “Obsession Trading” workflow.</p>
+        </div>
+      </div>
+
+      <div class="pillbar">
+        <div class="pill"><span class="dot"></span> Troy ounce → gram: <b>31.1035</b></div>
+        <div class="pill"><span class="dot"></span> Outputs are <b>metal value</b> (no taxes/premiums)</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Metals calculator -->
+      <section class="card">
+        <div class="card-body">
+          <h2>Metals Calculator <span class="badge">Gold + Silver</span></h2>
+
+          <div class="row">
+            <div>
+              <label for="currency">Currency label (display only)</label>
+              <input id="currency" type="text" value="USD" placeholder="USD / EUR / CHF ..." />
+              <p class="hint">This doesn’t fetch FX rates — it only labels your results.</p>
+            </div>
+            <div>
+              <label for="decimals">Decimals</label>
+              <select id="decimals">
+                <option value="2">2 (standard)</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+              </select>
+              <p class="hint">For retail bars, 2 decimals is usually enough.</p>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row">
+            <div>
+              <h2 style="margin-top:0;">Gold <span class="badge">karat</span></h2>
+              <label for="goldOunce">Gold price per troy ounce</label>
+              <input id="goldOunce" type="number" step="0.01" placeholder="e.g. 4807" />
+
+              <label for="goldKarat">Gold karat</label>
+              <select id="goldKarat">
+                <option value="24">24k (100%)</option>
+                <option value="22">22k (91.67%)</option>
+                <option value="21">21k (87.5%)</option>
+                <option value="18" selected>18k (75%)</option>
+                <option value="14">14k (58.33%)</option>
+                <option value="10">10k (41.67%)</option>
+              </select>
+
+              <label for="goldCustomKarat">Custom karat (optional)</label>
+              <input id="goldCustomKarat" type="number" step="0.01" placeholder="leave empty to use dropdown" />
+              <p class="hint">If you fill custom karat, it overrides the dropdown.</p>
+
+              <div class="results" id="goldResults" aria-live="polite">
+                <div class="kpi">
+                  <div>
+                    <div class="small">Gold price per gram</div>
+                    <div class="big" id="goldPerGram">—</div>
+                  </div>
+                  <div class="tag" id="goldPurityTag">Purity: —</div>
+                </div>
+
+                <div class="mini">
+                  <div class="box">
+                    <div class="lbl">24k per gram</div>
+                    <div class="val" id="gold24kPerGram">—</div>
+                  </div>
+                  <div class="box">
+                    <div class="lbl">Per kg (selected purity)</div>
+                    <div class="val" id="goldPerKg">—</div>
+                  </div>
+                </div>
+
+                <div class="foot">
+                  Note: Jewelry/retail prices include making fees, tax, and dealer premium.
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h2 style="margin-top:0;">Silver <span class="badge">purity %</span></h2>
+              <label for="silverOunce">Silver price per troy ounce</label>
+              <input id="silverOunce" type="number" step="0.0001" placeholder="e.g. 23.45" />
+
+              <label for="silverPurity">Silver purity (%)</label>
+              <select id="silverPurity">
+                <option value="99.99">99.99% (fine)</option>
+                <option value="99.9" selected>99.9%</option>
+                <option value="99.0">99.0%</option>
+                <option value="92.5">92.5% (sterling)</option>
+                <option value="90.0">90%</option>
+              </select>
+
+              <label for="silverCustomPurity">Custom purity % (optional)</label>
+              <input id="silverCustomPurity" type="number" step="0.01" placeholder="leave empty to use dropdown" />
+              <p class="hint">If you fill custom purity, it overrides the dropdown.</p>
+
+              <div class="results" id="silverResults" aria-live="polite">
+                <div class="kpi">
+                  <div>
+                    <div class="small">Silver price per gram</div>
+                    <div class="big" id="silverPerGram">—</div>
+                  </div>
+                  <div class="tag" id="silverPurityTag">Purity: —</div>
+                </div>
+
+                <div class="mini">
+                  <div class="box">
+                    <div class="lbl">100% per gram</div>
+                    <div class="val" id="silver100PerGram">—</div>
+                  </div>
+                  <div class="box">
+                    <div class="lbl">Per kg (selected purity)</div>
+                    <div class="val" id="silverPerKg">—</div>
+                  </div>
+                </div>
+
+                <div class="foot">
+                  Silver is often quoted with higher spreads in retail products.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="calcBtn">Calculate</button>
+            <button class="ghost" id="resetBtn" type="button">Reset</button>
+          </div>
+
+          <p class="hint">
+            Tip: Keep this tab open during trading sessions. It’s designed to be quick, clean, and “no mistakes”.
+          </p>
+        </div>
+      </section>
+
+      <!-- Obsession Trading Account panel -->
+      <aside class="card">
+        <div class="card-body">
+          <div class="ot-title">
+            <h2 style="margin:0;">Obsession Trading Account <span class="badge">risk sanity</span></h2>
+            <span class="chip">FTMO-style</span>
+          </div>
+
+          <p class="hint" style="margin-top:6px;">
+            Optional panel: quick risk math so you don’t give profits back. Doesn’t connect to any broker.
+          </p>
+
+          <label for="equity">Account equity</label>
+          <input id="equity" type="number" step="0.01" placeholder="e.g. 100000" />
+
+          <div class="row">
+            <div>
+              <label for="riskPct">Risk per trade (%)</label>
+              <input id="riskPct" type="number" step="0.01" value="0.25" />
+            </div>
+            <div>
+              <label for="slPoints">Stop-loss distance (points / $ / ticks)</label>
+              <input id="slPoints" type="number" step="0.01" placeholder="e.g. 250" />
+            </div>
+          </div>
+
+          <label for="valuePerPoint">Value per point (your instrument)</label>
+          <input id="valuePerPoint" type="number" step="0.0001" placeholder="e.g. 1.00" />
+
+          <div class="results" aria-live="polite">
+            <div class="kpi">
+              <div>
+                <div class="small">Max loss allowed (this trade)</div>
+                <div class="big" id="riskAmount">—</div>
+              </div>
+              <div class="tag" id="riskTag">Sizing: —</div>
+            </div>
+
+            <div class="mini">
+              <div class="box">
+                <div class="lbl">Implied position size</div>
+                <div class="val" id="posSize">—</div>
+              </div>
+              <div class="box">
+                <div class="lbl">Loss at SL (check)</div>
+                <div class="val" id="lossCheck">—</div>
+              </div>
+            </div>
+
+            <div class="note" id="riskNote">
+              Enter equity + risk% + SL distance + value/point to get sizing.
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="riskBtn" type="button">Compute Risk</button>
+            <button class="ghost" id="riskResetBtn" type="button">Clear</button>
+          </div>
+
+          <p class="hint">
+            Reminder: in chop, reduce size. Protecting a win is a strategy.
+          </p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const TROY_OUNCE_TO_GRAM = 31.1035;
+
+    const fmt = (num, decimals, currencyLabel) => {
+      if (num === null || !isFinite(num)) return "—";
+      return `${Number(num).toFixed(decimals)} ${currencyLabel}`;
+    };
+
+    const getDecimals = () => Number(document.getElementById("decimals").value);
+    const getCurrency = () => (document.getElementById("currency").value || "USD").trim();
+
+    function calcMetalPerGram(ouncePrice, purityPercent){
+      // per gram at 100% purity:
+      const perGram100 = ouncePrice / TROY_OUNCE_TO_GRAM;
+      // apply purity:
+      return {
+        perGram100,
+        perGram: perGram100 * (purityPercent / 100.0),
+        perKg: (perGram100 * (purityPercent / 100.0)) * 1000
+      };
+    }
+
+    function calcGold(){
+      const dec = getDecimals();
+      const cur = getCurrency();
+
+      const goldOunce = Number(document.getElementById("goldOunce").value);
+      const dropdownKarat = Number(document.getElementById("goldKarat").value);
+      const customKaratRaw = document.getElementById("goldCustomKarat").value;
+      const karat = customKaratRaw !== "" ? Number(customKaratRaw) : dropdownKarat;
+
+      if (!isFinite(goldOunce) || goldOunce <= 0 || !isFinite(karat) || karat <= 0){
+        document.getElementById("goldPerGram").textContent = "—";
+        document.getElementById("goldPurityTag").textContent = "Purity: —";
+        document.getElementById("gold24kPerGram").textContent = "—";
+        document.getElementById("goldPerKg").textContent = "—";
+        return;
+      }
+
+      const purityPercent = (karat / 24.0) * 100.0;
+      const gold = calcMetalPerGram(goldOunce, purityPercent);
+      const gold24 = calcMetalPerGram(goldOunce, 100);
+
+      document.getElementById("goldPerGram").textContent = fmt(gold.perGram, dec, cur) + " / g";
+      document.getElementById("goldPurityTag").textContent = `Purity: ${purityPercent.toFixed(2)}% (${karat}k)`;
+      document.getElementById("gold24kPerGram").textContent = fmt(gold24.perGram, dec, cur) + " / g";
+      document.getElementById("goldPerKg").textContent = fmt(gold.perKg, dec, cur) + " / kg";
+    }
+
+    function calcSilver(){
+      const dec = getDecimals();
+      const cur = getCurrency();
+
+      const silverOunce = Number(document.getElementById("silverOunce").value);
+      const dropdownPurity = Number(document.getElementById("silverPurity").value);
+      const customPurityRaw = document.getElementById("silverCustomPurity").value;
+      const purityPercent = customPurityRaw !== "" ? Number(customPurityRaw) : dropdownPurity;
+
+      if (!isFinite(silverOunce) || silverOunce <= 0 || !isFinite(purityPercent) || purityPercent <= 0){
+        document.getElementById("silverPerGram").textContent = "—";
+        document.getElementById("silverPurityTag").textContent = "Purity: —";
+        document.getElementById("silver100PerGram").textContent = "—";
+        document.getElementById("silverPerKg").textContent = "—";
+        return;
+      }
+
+      const silver = calcMetalPerGram(silverOunce, purityPercent);
+      const silver100 = calcMetalPerGram(silverOunce, 100);
+
+      document.getElementById("silverPerGram").textContent = fmt(silver.perGram, dec, cur) + " / g";
+      document.getElementById("silverPurityTag").textContent = `Purity: ${purityPercent.toFixed(2)}%`;
+      document.getElementById("silver100PerGram").textContent = fmt(silver100.perGram, dec, cur) + " / g";
+      document.getElementById("silverPerKg").textContent = fmt(silver.perKg, dec, cur) + " / kg";
+    }
+
+    function calcAll(){
+      calcGold();
+      calcSilver();
+    }
+
+    function resetAll(){
+      document.getElementById("currency").value = "USD";
+      document.getElementById("decimals").value = "2";
+      document.getElementById("goldOunce").value = "";
+      document.getElementById("goldKarat").value = "18";
+      document.getElementById("goldCustomKarat").value = "";
+      document.getElementById("silverOunce").value = "";
+      document.getElementById("silverPurity").value = "99.9";
+      document.getElementById("silverCustomPurity").value = "";
+      calcAll();
+    }
+
+    // Risk panel
+    function computeRisk(){
+      const dec = getDecimals();
+      const cur = getCurrency();
+
+      const equity = Number(document.getElementById("equity").value);
+      const riskPct = Number(document.getElementById("riskPct").value);
+      const slPoints = Number(document.getElementById("slPoints").value);
+      const valuePerPoint = Number(document.getElementById("valuePerPoint").value);
+
+      const riskAmountEl = document.getElementById("riskAmount");
+      const posSizeEl = document.getElementById("posSize");
+      const lossCheckEl = document.getElementById("lossCheck");
+      const riskTagEl = document.getElementById("riskTag");
+      const noteEl = document.getElementById("riskNote");
+
+      if (![equity, riskPct, slPoints, valuePerPoint].every(v => isFinite(v) && v > 0)){
+        riskAmountEl.textContent = "—";
+        posSizeEl.textContent = "—";
+        lossCheckEl.textContent = "—";
+        riskTagEl.textContent = "Sizing: —";
+        noteEl.innerHTML = `Enter equity + risk% + SL distance + value/point to get sizing.`;
+        return;
+      }
+
+      const maxLoss = equity * (riskPct / 100.0);
+      // size such that: loss = size * slPoints * valuePerPoint = maxLoss
+      const size = maxLoss / (slPoints * valuePerPoint);
+      const lossCheck = size * slPoints * valuePerPoint;
+
+      riskAmountEl.textContent = fmt(maxLoss, dec, cur);
+      posSizeEl.textContent = size.toFixed(4);
+      lossCheckEl.textContent = fmt(lossCheck, dec, cur);
+
+      // Quick sanity text
+      const good = riskPct <= 0.5;
+      riskTagEl.textContent = good ? "Sizing: disciplined" : "Sizing: aggressive";
+      noteEl.innerHTML = good
+        ? `<span class="ok">Good.</span> Small risk per trade helps you survive chop.`
+        : `<span class="warn">Careful.</span> High risk% is how wins get given back in volatility.`;
+    }
+
+    function resetRisk(){
+      document.getElementById("equity").value = "";
+      document.getElementById("riskPct").value = "0.25";
+      document.getElementById("slPoints").value = "";
+      document.getElementById("valuePerPoint").value = "";
+      computeRisk();
+    }
+
+    // Bind buttons
+    document.getElementById("calcBtn").addEventListener("click", calcAll);
+    document.getElementById("resetBtn").addEventListener("click", resetAll);
+
+    document.getElementById("riskBtn").addEventListener("click", computeRisk);
+    document.getElementById("riskResetBtn").addEventListener("click", resetRisk);
+
+    // Auto-calc on change (nice UX)
+    ["currency","decimals","goldOunce","goldKarat","goldCustomKarat","silverOunce","silverPurity","silverCustomPurity"]
+      .forEach(id => document.getElementById(id).addEventListener("input", calcAll));
+
+    ["equity","riskPct","slPoints","valuePerPoint"].forEach(id => {
+      document.getElementById(id).addEventListener("input", computeRisk);
+    });
+
+    // Initial paint
+    calcAll();
+    computeRisk();
+  </script>
+</body>
+</html>

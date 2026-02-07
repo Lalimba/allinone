@@ -1,0 +1,110 @@
+# main.py
+from colorama import init, Fore, Style
+init(autoreset=True)
+
+def color_status(status: str) -> str:
+    if status == "GREEN":
+        return Fore.GREEN + status + Style.RESET_ALL
+    if status == "RED":
+        return Fore.RED + status + Style.RESET_ALL
+    return Fore.YELLOW + status + Style.RESET_ALL
+
+def explain_line(name: str, m: dict, status: str) -> str:
+    # Beginner-friendly explanation based on metrics
+    depth_m = m["depth_delta_usd"] / 1e6
+    oi = m["oi_chg_pct"]
+    funding = m["funding_pct"]
+
+    notes = []
+    # You can tune these thresholds
+    if abs(depth_m) < 3:
+        notes.append("low orderbook activity")
+    if abs(oi) < 0.03:
+        notes.append("OI almost flat (no forced flow)")
+    if abs(funding) > 0.02:
+        notes.append("funding extreme")
+
+    if not notes:
+        notes.append("conditions align")
+
+    return f"{name}: " + ", ".join(notes)
+
+def fmt_row(name: str, status: str, m: dict) -> str:
+    return (
+        f"{name:<7} | {color_status(status):<10} | "
+        f"Price={m['price']:.2f} | "
+        f"OIΔ={m['oi_chg_pct']:.2f}% | "
+        f"Funding={m['funding_pct']:.4f}% | "
+        f"ΔDepth={m['depth_delta_usd']/1e6:.1f}M"
+    )
+
+import time
+from bybit_public import BybitLinearPublic
+from binance_public import BinanceFuturesPublic
+from signal_engine import SignalConfig, GreenLightEngine
+
+SYMBOL = "BTCUSDT"
+POLL_SECONDS = 5
+
+# Put YOUR real zones here (range edges / EQH/EQL / PDH/PDL)
+ZONES = [
+    ("Range Low / EQL", 89000),
+    ("Range High / EQH", 92200),
+]
+
+def run_one(name: str, api, engine: GreenLightEngine):
+    price = api.price()
+    oi = api.open_interest()
+    funding = api.funding_rate()
+    bids, asks = api.orderbook(limit=100)
+    status, reasons, m = engine.update(price, bids, asks, oi, funding)
+    return name, status, reasons, m
+
+def fmt_line(name, status, m):
+    return (f"{name:<7} | {status:<5} | Price={m['price']:.2f} | "
+            f"OIΔ={m['oi_chg_pct']:.2f}% | Funding={m['funding_pct']:.4f}% | "
+            f"ΔDepth={m['depth_delta_usd']/1e6:.1f}M")
+
+def main():
+    cfg = SignalConfig(
+        depth_band_pct=0.01,
+        min_depth_delta_usd=20_000_000,
+        min_oi_drop_pct=0.25,
+        max_abs_funding_pct=0.02,
+        zones=ZONES,
+        zone_proximity_pct=0.0015,
+    )
+
+    # Separate engines so each exchange has its own prev snapshots
+    bybit_engine = GreenLightEngine(cfg)
+    binance_engine = GreenLightEngine(cfg)
+
+    bybit = BybitLinearPublic(SYMBOL)
+    binance = BinanceFuturesPublic(SYMBOL)
+
+    while True:
+        try:
+            b1 = run_one("BYBIT", bybit, bybit_engine)
+            b2 = run_one("BINANCE", binance, binance_engine)
+
+           print("=" * 95)
+print(fmt_row(b1[0], b1[1], b1[3]))
+print("  " + explain_line(b1[0], b1[3], b1[1]))
+print(fmt_row(b2[0], b2[1], b2[3]))
+print("  " + explain_line(b2[0], b2[3], b2[1]))
+
+
+            # Optional: show reasons only when GREEN
+            for name, status, reasons, m in [b1, b2]:
+                if status == "GREEN":
+                    print(f"\n{name} GREEN reasons:")
+                    for r in reasons:
+                        print(" -", r)
+
+        except Exception as e:
+            print("[ERROR]", e)
+
+        time.sleep(POLL_SECONDS)
+
+if __name__ == "__main__":
+    main()
