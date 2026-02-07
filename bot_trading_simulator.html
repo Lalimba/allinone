@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leveraged Trading Bot Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+        }
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        .protocol-log {
+            height: 300px;
+            overflow-y: auto;
+            background-color: #010409;
+            border: 1px solid #30363d;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { color: #56d364; }
+        .error { color: #f85149; }
+        .info { color: #79c0ff; }
+        .system { color: #8b949e; }
+        .pending-limit { color: #ffeb3b; } /* Yellow for pending limit */
+        .pending-stop { color: #f97316; } /* Orange for pending stop */
+        .liquidation { color: #ff0000; font-weight: bold; } /* Bright red for liquidation */
+        .command-usage {
+            background-color: #21262d;
+            padding: 0.5rem;
+            border-radius: 0.3rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Firebase Initialization and Global Variables -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // setLogLevel('Debug'); // Uncomment for debugging Firestore
+
+        // Global variables from the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // --- IMPORTANT: Your Crypto Compare API Key ---
+        const CRYPTO_COMPARE_API_KEY = "77894870c49b74cbd892d8de8adcbf595cc757d99f8c242ef36cd785449085e9";
+        
+        // Global Firebase instances
+        window.firebaseApp = null;
+        window.db = null;
+        window.auth = null;
+        window.userId = null;
+        window.userDocRef = null;
+
+        // Bot State (to be loaded)
+        window.botState = {
+            balance: 10000.00,
+            positions: [], // Active, open positions
+            pendingOrders: [], // Orders waiting for fill price
+            cumulativeLoss: 0.00, // New field for cumulative loss
+            totalLiquidations: 0, // New field for total liquidations
+            priceOffset: 0.00
+        };
+        window.btcPrice = 0.00; // Current BTC Price
+
+        // Logs a message to the protocol box
+        function log(message, type = 'system') {
+            const logElement = document.getElementById('protocol-log');
+            if (!logElement) return; // Prevent error if log box isn't ready
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span class="${type}">${time} - [${type.toUpperCase()}] ${message}</span>`;
+            logElement.prepend(logEntry); // Prepend to show newest first
+        }
+        window.log = log; // Make Log globally available
+
+        // Updates the UI with current state data
+        function updateUI() {
+            // Check if essential elements exist before proceeding
+            const balanceElement = document.getElementById('current-balance');
+            const pnlElement = document.getElementById('unrealized-pnl');
+            const priceDisplay = document.getElementById('btc-price-display');
+            const positionsBody = document.getElementById('positions-body');
+            // New Risk History elements
+            const cumulativeLossElement = document.getElementById('cumulative-loss');
+            const liquidationsElement = document.getElementById('total-liquidations');
+
+            if (!balanceElement || !pnlElement || !priceDisplay || !positionsBody || !cumulativeLossElement || !liquidationsElement) {
+                // DOM not fully loaded yet, wait for the next call
+                return; 
+            }
+
+            // Calculate total reserved margin (for display)
+            const reservedMargin = window.botState.pendingOrders.reduce((sum, order) => sum + order.marginUSD, 0);
+            const activeMargin = window.botState.positions.reduce((sum, pos) => sum + pos.marginUSD, 0);
+            // The displayed balance is the total balance minus all reserved margin (active and pending)
+            const displayBalance = window.botState.balance - reservedMargin - activeMargin;
+
+            balanceElement.textContent = `$${displayBalance.toFixed(2)}`;
+            
+            // Unrealized P&L Calculation
+            let totalUnrealizedPnL = 0;
+            window.botState.positions.forEach(pos => {
+                const currentPrice = window.btcPrice || pos.entryPrice; // Use entry price if live price hasn't loaded yet
+                // PnL = (Current Price - Entry Price) * BTC Amount * Leverage * Direction
+                // Direction: 1 for long, -1 for short
+                const direction = (pos.type === 'long' ? 1 : -1);
+                const pnl = (currentPrice - pos.entryPrice) * pos.amountBTC * pos.leverage * direction;
+                totalUnrealizedPnL += pnl;
+            });
+
+            pnlElement.textContent = `${totalUnrealizedPnL >= 0 ? '+' : ''}$${totalUnrealizedPnL.toFixed(2)}`;
+            pnlElement.className = `text-4xl font-extrabold ${totalUnrealizedPnL >= 0 ? 'text-green-500' : 'text-red-500'}`;
+            
+            // Update Risk History
+            cumulativeLossElement.textContent = `-$${window.botState.cumulativeLoss.toFixed(2)}`;
+            liquidationsElement.textContent = window.botState.totalLiquidations;
+
+            // BTC Price Display
+            if (window.btcPrice > 0) {
+                const oldPrice = parseFloat(priceDisplay.dataset.lastPrice) || window.btcPrice;
+                const priceDiff = window.btcPrice - oldPrice;
+                
+                let priceClass = 'text-white';
+                if (Math.abs(priceDiff) > 0.01) { 
+                    priceClass = priceDiff > 0 ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse';
+                    setTimeout(() => {
+                        priceDisplay.classList.remove('animate-pulse', 'text-green-400', 'text-red-400');
+                        priceDisplay.classList.add('text-white');
+                    }, 500);
+                }
+
+                priceDisplay.textContent = `$${window.btcPrice.toFixed(2)}`;
+                priceDisplay.classList = `text-4xl font-extrabold ${priceClass}`; 
+                priceDisplay.dataset.lastPrice = window.btcPrice.toFixed(2); 
+            } else {
+                priceDisplay.textContent = 'Loading Price...';
+                priceDisplay.classList = 'text-4xl font-extrabold text-gray-400';
+            }
+
+            // Open Positions Table
+            positionsBody.innerHTML = '';
+            
+            if (window.botState.positions.length === 0 && window.botState.pendingOrders.length === 0) {
+                 positionsBody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-400">No open or pending orders.</td></tr>';
+            } else {
+                // 1. Display PENDING Orders
+                window.botState.pendingOrders.forEach((order) => {
+                    const orderStatus = order.orderType.toUpperCase();
+                    const statusClass = orderStatus === 'LIMIT' ? 'pending-limit' : 'pending-stop';
+                    const bgClass = orderStatus === 'LIMIT' ? 'bg-yellow-900/20' : 'bg-orange-900/20';
+                    const row = `
+                        <tr class="hover:bg-gray-800/50 transition-colors ${bgClass} text-yellow-300">
+                            <td class="p-3">${order.id.substring(order.id.length - 4)}</td>
+                            <td class="p-3 font-semibold ${order.type === 'long' ? 'text-green-500' : 'text-red-500'}">${order.type.toUpperCase()} (${order.leverage}x) - <span class="${statusClass}">${orderStatus}</span></td>
+                            <td class="p-3">${order.marginUSD.toFixed(2)} USD</td>
+                            <td class="p-3 font-bold">${order.entryPrice.toFixed(2)} (Limit)</td>
+                            <td class="p-3 text-gray-400">Margin Reserved</td>
+                            <td class="p-3">
+                                <button onclick="window.cancelOrderById('${order.id.substring(order.id.length - 4)}')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1 px-3 rounded-md text-sm transition-colors">
+                                    Cancel
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    positionsBody.innerHTML += row;
+                });
+
+                // 2. Display ACTIVE Positions
+                window.botState.positions.forEach((pos) => {
+                    const currentPrice = window.btcPrice;
+                    const direction = (pos.type === 'long' ? 1 : -1);
+                    const pnlRaw = (currentPrice - pos.entryPrice) * pos.amountBTC * pos.leverage * direction;
+                    const pnlPercent = (pnlRaw / pos.marginUSD) * 100;
+                    const pnlColor = pnlRaw >= 0 ? 'text-green-400' : 'text-red-400';
+
+                    const row = `
+                        <tr class="hover:bg-gray-800 transition-colors">
+                            <td class="p-3">${pos.id.substring(pos.id.length - 4)}</td>
+                            <td class="p-3 font-semibold ${pos.type === 'long' ? 'text-green-500' : 'text-red-500'}">${pos.type.toUpperCase()} (${pos.leverage}x) - ACTIVE</td>
+                            <td class="p-3">${pos.marginUSD.toFixed(2)} USD</td>
+                            <td class="p-3">${pos.entryPrice.toFixed(2)}</td>
+                            <td class="p-3 ${pnlColor}">
+                                ${pnlRaw.toFixed(2)} USD <br> (${pnlPercent.toFixed(2)}%)
+                            </td>
+                            <td class="p-3">
+                                <button onclick="window.closePosition('${pos.id}')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md text-sm transition-colors">
+                                    Close
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    positionsBody.innerHTML += row;
+                });
+            }
+        }
+        window.updateUI = updateUI; 
+
+        // Firestore Save State
+        async function saveState() {
+            if (!window.userDocRef) return;
+            try {
+                const stateToSave = {
+                    balance: window.botState.balance,
+                    positions: window.botState.positions,
+                    pendingOrders: window.botState.pendingOrders, 
+                    cumulativeLoss: window.botState.cumulativeLoss, // Save new field
+                    totalLiquidations: window.botState.totalLiquidations, // Save new field
+                    priceOffset: 0.00
+                };
+                await setDoc(window.userDocRef, stateToSave, { merge: true });
+            } catch (e) {
+                log(`ERROR saving state: ${e.message}`, 'error');
+            }
+        }
+
+        // Firestore Load/Listen State
+        function setupStateListener() {
+            if (!window.userDocRef) return;
+
+            onSnapshot(window.userDocRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    if (data.balance !== undefined) {
+                        window.botState.balance = data.balance;
+                        window.botState.positions = data.positions || [];
+                        window.botState.pendingOrders = data.pendingOrders || [];
+                        // Load new fields, providing defaults if they don't exist yet
+                        window.botState.cumulativeLoss = data.cumulativeLoss || 0.00; 
+                        window.botState.totalLiquidations = data.totalLiquidations || 0; 
+
+                        const reservedMargin = window.botState.pendingOrders.reduce((sum, order) => sum + order.marginUSD, 0);
+                        const activeMargin = window.botState.positions.reduce((sum, pos) => sum + pos.marginUSD, 0);
+                        const availableBalance = window.botState.balance - reservedMargin - activeMargin;
+
+                        log(`State loaded from database. Available Balance: $${availableBalance.toFixed(2)}`, 'info');
+                        updateUI();
+                    }
+                } else {
+                    log("No state found in database. Initializing with $10,000.00.", 'info');
+                    window.botState.balance = 10000.00;
+                    window.botState.positions = [];
+                    window.botState.pendingOrders = [];
+                    window.botState.cumulativeLoss = 0.00; 
+                    window.botState.totalLiquidations = 0; 
+                    saveState(); // Save initial state
+                }
+            }, (error) => {
+                log(`ERROR listening to state changes: ${error.message}`, 'error');
+            });
+        }
+
+        // Initialize Firebase and authenticate the user
+        async function initializeFirebase() {
+            updateUI(); // Draw initial UI state immediately
+            if (!firebaseConfig) {
+                log("SYSTEM: Firebase configuration not available. Running in local mode.", 'error');
+                return;
+            }
+
+            try {
+                window.firebaseApp = initializeApp(firebaseConfig);
+                window.db = getFirestore(window.firebaseApp);
+                window.auth = getAuth(window.firebaseApp);
+                
+                log("SYSTEM: Initializing Firebase and authenticating...", 'system');
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(window.auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(window.auth);
+                }
+
+                await new Promise(resolve => {
+                    const unsubscribe = onAuthStateChanged(window.auth, (user) => {
+                        if (user) {
+                            window.userId = user.uid;
+                            // Path: /artifacts/{appId}/users/{userId}/data/bot_state
+                            window.userDocRef = doc(window.db, `artifacts/${appId}/users/${window.userId}/data/bot_state`);
+                            log(`Authentication successful. User ID: ${window.userId}`, 'success');
+                            unsubscribe();
+                            resolve();
+                        } else {
+                            // Should not happen if signInAnonymously is called, but as a fallback
+                            window.userId = crypto.randomUUID(); 
+                            log(`Authentication failed or anonymous. Using temporary ID: ${window.userId}`, 'error');
+                            unsubscribe();
+                            resolve();
+                        }
+                    });
+                });
+
+                setupStateListener();
+                
+            } catch (e) {
+                log(`SYSTEM: FATAL ERROR during Firebase initialization: ${e.message}`, 'error');
+            }
+        }
+
+        // --- Fetch BTC Price from Crypto Compare (WITH API Key) ---
+        async function fetchBitcoinPrice() {
+            const apiUrl = 'https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD';
+            
+            const headers = {};
+            if (CRYPTO_COMPARE_API_KEY) {
+                headers['Authorization'] = `Apikey ${CRYPTO_COMPARE_API_KEY}`;
+                document.getElementById('btc-price-source').textContent = ' (Source: Crypto Compare API, Pro-Key)';
+            } else {
+                document.getElementById('btc-price-source').textContent = ' (Source: Crypto Compare API, Public)';
+            }
+
+            let retries = 0;
+            const maxRetries = 5;
+
+            while (retries < maxRetries) {
+                try {
+                    const response = await fetch(apiUrl, { headers: headers });
+                    if (!response.ok) {
+                        if (response.status === 401 || response.status === 403) {
+                             throw new Error(`Authorization error (${response.status}). Please check your API key.`);
+                        }
+                        throw new Error(`HTTP Error: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    
+                    if (data && data.USD) {
+                        const newPrice = parseFloat(data.USD);
+                        // Check if the price has changed meaningfully before logging
+                        if (window.btcPrice === 0 || Math.abs(newPrice - window.btcPrice) > 0.01) {
+                            window.btcPrice = newPrice;
+                            checkPendingOrders(); // Check orders every time price updates
+                            updateUI();
+                        }
+                        return; // Success, exit function
+                    } else if (data && data.Message) {
+                        throw new Error(`API Message: ${data.Message}`);
+                    } else {
+                         throw new Error("Unexpected data structure from API.");
+                    }
+
+                } catch (error) {
+                    // Log the error but don't display it to avoid spamming the log on temporary network issues
+                    // console.error(`Price fetch failed (Retry ${retries + 1}):`, error.message); 
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
+                    retries++;
+                }
+            }
+            log('FATAL: Could not fetch BTC price after multiple retries.', 'error');
+            window.btcPrice = 0;
+            updateUI();
+        }
+
+        // Starts the price loop (every 2 seconds)
+        function startPriceLoop() {
+            fetchBitcoinPrice(); // First call immediately
+            // Use a separate function to manage the interval so we can call it immediately
+            const intervalId = setInterval(fetchBitcoinPrice, 2000); 
+            // In a real scenario, you'd manage intervalId cleanup on app close.
+            log("SYSTEM: Price tracking started. Checking every 2 seconds.", 'system');
+        }
+
+        // --- Trading Logic ---
+        
+        // Checks all pending orders against the current BTC price and executes them if conditions are met
+        function checkPendingOrders() {
+            const currentPrice = window.btcPrice;
+            if (currentPrice <= 0) return; // Cannot check orders without a price
+
+            const filledOrders = [];
+            const remainingOrders = [];
+
+            window.botState.pendingOrders.forEach(order => {
+                let shouldExecute = false;
+
+                // ** CRITICAL RULE: Never execute if currentPrice === entryPrice **
+                if (currentPrice === order.entryPrice) {
+                    remainingOrders.push(order);
+                    return; // Skip execution and continue waiting
+                }
+
+                // Limit Orders (Favorable Price Moves)
+                if (order.orderType === 'LIMIT') {
+                    if (order.type === 'long' && currentPrice < order.entryPrice) {
+                        // Buy Limit: Price is BELOW entry (Favorable)
+                        shouldExecute = true;
+                    } else if (order.type === 'short' && currentPrice > order.entryPrice) {
+                        // Sell Limit: Price is ABOVE entry (Favorable)
+                        shouldExecute = true;
+                    }
+                }
+                
+                // Stop Orders (Momentum Price Moves)
+                else if (order.orderType === 'STOP') {
+                    if (order.type === 'long' && currentPrice > order.entryPrice) {
+                        // Buy Stop: Price is ABOVE entry (Momentum)
+                        shouldExecute = true;
+                    } else if (order.type === 'short' && currentPrice < order.entryPrice) {
+                        // Sell Stop: Price is BELOW entry (Momentum)
+                        shouldExecute = true;
+                    }
+                }
+
+                if (shouldExecute) {
+                    filledOrders.push(order);
+                } else {
+                    remainingOrders.push(order);
+                }
+            });
+
+            // Update the state with executed and remaining orders
+            window.botState.pendingOrders = remainingOrders;
+
+            // Execute the filled orders
+            filledOrders.forEach(order => {
+                const position = {
+                    id: order.id, // Keep the same ID
+                    type: order.type,
+                    entryPrice: currentPrice, // Filled at the current market price, not the order price
+                    marginUSD: order.marginUSD,
+                    amountBTC: order.amountBTC,
+                    leverage: order.leverage,
+                    tpPrice: order.tpPrice,
+                    slPrice: order.slPrice,
+                };
+                window.botState.positions.push(position);
+                log(`ORDER FILLED: ${order.type.toUpperCase()} ${order.orderType} ID ${order.id.substring(order.id.length - 4)} filled at $${currentPrice.toFixed(2)} (Margin: $${order.marginUSD.toFixed(2)})`, 'success');
+            });
+            
+            // Now check active positions for Stop Loss (SL), Take Profit (TP), and Liquidation
+            checkActivePositions();
+            
+            if (filledOrders.length > 0) {
+                 saveState();
+            }
+        }
+
+        // Checks active positions for SL/TP/Liquidation
+        function checkActivePositions() {
+            const currentPrice = window.btcPrice;
+            if (currentPrice <= 0) return;
+
+            const nextPositions = [];
+            let closedPositionsProfit = 0;
+            let needsSave = false;
+
+            window.botState.positions.forEach(pos => {
+                let closeReason = null;
+                const direction = (pos.type === 'long' ? 1 : -1);
+                const pnlRaw = (currentPrice - pos.entryPrice) * pos.amountBTC * pos.leverage * direction;
+                
+                // 1. Check Take Profit (TP)
+                if (pos.tpPrice > 0) {
+                    if (pos.type === 'long' && currentPrice >= pos.tpPrice) {
+                        closeReason = 'TP';
+                    } else if (pos.type === 'short' && currentPrice <= pos.tpPrice) {
+                        closeReason = 'TP';
+                    }
+                }
+
+                // 2. Check Stop Loss (SL)
+                if (pos.slPrice > 0 && !closeReason) {
+                    if (pos.type === 'long' && currentPrice <= pos.slPrice) {
+                        closeReason = 'SL';
+                    } else if (pos.type === 'short' && currentPrice >= pos.slPrice) {
+                        closeReason = 'SL';
+                    }
+                }
+
+                // 3. Check Liquidation (PnL < -Margin)
+                // A position is liquidated when the PnL is less than or equal to the negative margin used.
+                if (pnlRaw <= -pos.marginUSD && !closeReason) {
+                    closeReason = 'LIQUIDATION';
+                }
+
+                if (closeReason) {
+                    needsSave = true;
+                    // Calculate final PnL at close
+                    let finalPnL = pnlRaw;
+                    if (closeReason === 'LIQUIDATION') {
+                        finalPnL = -pos.marginUSD; // Loss is capped at the margin
+                        window.botState.totalLiquidations += 1; // Increment liquidation count
+                    }
+                    
+                    window.botState.balance += pos.marginUSD; // Return margin used
+                    window.botState.balance += finalPnL; // Apply PnL
+
+                    closedPositionsProfit += finalPnL;
+                    const logType = closeReason === 'LIQUIDATION' ? 'liquidation' : (finalPnL >= 0 ? 'success' : 'error');
+
+                    // Update cumulative loss tracker if it was a loss
+                    if (finalPnL < 0) {
+                        window.botState.cumulativeLoss += Math.abs(finalPnL);
+                    }
+
+                    log(`CLOSED: ${pos.type.toUpperCase()} ID ${pos.id.substring(pos.id.length - 4)} closed at $${currentPrice.toFixed(2)}. Reason: ${closeReason}. PnL: $${finalPnL.toFixed(2)}`, logType);
+
+                } else {
+                    nextPositions.push(pos);
+                }
+            });
+
+            window.botState.positions = nextPositions;
+            if (needsSave || closedPositionsProfit !== 0) {
+                saveState();
+            }
+        }
+
+        // Executes a Buy/Sell order (Creates a PENDING Order)
+        window.executeTrade = function(command) {
+            const parts = command.trim().toLowerCase().split(/\s+/);
+            const action = parts[0];
+            
+            if (action === '/portfolio') {
+                log("Showing Portfolio: See 'Open Positions & Pending Orders' table.", 'info');
+                return;
+            }
+
+            if (action === '/close') {
+                const idPart = parts[1];
+                if (idPart) {
+                    // Check if it's an open position
+                    const openPosition = window.botState.positions.find(p => p.id.endsWith(idPart));
+                    if (openPosition) {
+                        window.closePosition(openPosition.id);
+                    } else {
+                         log(`ERROR: Active Position with ID ending in ${idPart} not found. Use /cancel for pending orders.`, 'error');
+                    }
+                } else {
+                    log("ERROR: Please use the correct command format: /close [ID].", 'error');
+                }
+                return;
+            }
+            
+            if (action === '/cancel') {
+                 const idPart = parts[1];
+                 if (idPart) {
+                     window.cancelOrderById(idPart);
+                 } else {
+                    log("ERROR: Please use the correct command format: /cancel [ID].", 'error');
+                 }
+                 return;
+            }
+            
+            let tradeType = '';
+            let orderType = '';
+            let validCommand = true;
+
+            if (action === '/buy' || action === '/sell') {
+                // Default /buy and /sell to LIMIT orders
+                tradeType = action === '/buy' ? 'long' : 'short';
+                orderType = 'LIMIT';
+            } else if (action === '/buystop' || action === '/sellstop') {
+                // New commands for STOP orders
+                tradeType = action === '/buystop' ? 'long' : 'short';
+                orderType = 'STOP';
+            } else {
+                validCommand = false;
+                log("ERROR: Unknown command. Usage: /buy, /sell, /buystop, /sellstop, /close [ID], /cancel [ID], or /portfolio", 'error');
+            }
+
+
+            if (validCommand) {
+                if (window.btcPrice <= 0) {
+                    log("ERROR: Cannot trade, BTC price is 0 or loading. Please wait.", 'error');
+                    return;
+                }
+                // Usage: /buy/sell/buystop/sellstop [Margin_USD] [Entry] [TP] [SL] [Leverage_X]
+
+                if (parts.length !== 6) {
+                    log("ERROR: Invalid trade command format. Usage: /buy... [Margin_USD] [Entry] [TP] [SL] [Leverage_X]", 'error');
+                    return;
+                }
+
+                const marginUSD = parseFloat(parts[1]);
+                const entryPrice = parseFloat(parts[2]); 
+                const tpPrice = parseFloat(parts[3]);
+                const slPrice = parseFloat(parts[4]);
+                const leverageX = parseInt(parts[5].replace('x', ''), 10);
+                
+                // 1. Validations
+                const reservedMargin = window.botState.pendingOrders.reduce((sum, order) => sum + order.marginUSD, 0);
+                const activeMargin = window.botState.positions.reduce((sum, pos) => sum + pos.marginUSD, 0);
+                const availableBalance = window.botState.balance - reservedMargin - activeMargin;
+
+                if (isNaN(marginUSD) || marginUSD <= 0 || marginUSD > availableBalance) {
+                    log(`ERROR: Invalid margin amount. Must be > 0 and <= Available Balance ($${availableBalance.toFixed(2)}).`, 'error');
+                    return;
+                }
+                if (isNaN(entryPrice) || entryPrice <= 0 || isNaN(leverageX) || leverageX < 1 || leverageX > 100) {
+                    log("ERROR: Invalid Entry Price (must be > 0) or Leverage (must be 1-100x).", 'error');
+                    return;
+                }
+
+                // Calculate the BTC amount being traded
+                const totalValueUSD = marginUSD * leverageX;
+                const amountBTC = totalValueUSD / entryPrice; // BTC amount is based on entry price
+
+                // 2. Create and Store Order
+                const newOrder = {
+                    id: crypto.randomUUID(),
+                    type: tradeType,
+                    orderType: orderType,
+                    entryPrice: entryPrice,
+                    tpPrice: isNaN(tpPrice) ? 0 : tpPrice,
+                    slPrice: isNaN(slPrice) ? 0 : slPrice,
+                    marginUSD: marginUSD,
+                    leverage: leverageX,
+                    amountBTC: amountBTC,
+                    timestamp: Date.now()
+                };
+
+                window.botState.pendingOrders.push(newOrder);
+
+                // 3. Log and Save
+                log(`PENDING ORDER: ${tradeType.toUpperCase()} ${orderType} order placed at $${entryPrice.toFixed(2)} with ${leverageX}x leverage. Margin reserved: $${marginUSD.toFixed(2)}.`, 'info');
+                saveState();
+                updateUI();
+            }
+        };
+
+        // Cancels a pending order by its last 4 digits of ID
+        window.cancelOrderById = function(idPart) {
+            const index = window.botState.pendingOrders.findIndex(order => order.id.endsWith(idPart));
+            
+            if (index !== -1) {
+                const order = window.botState.pendingOrders[index];
+                window.botState.pendingOrders.splice(index, 1);
+                
+                log(`CANCELLED: Pending order ID ${idPart} cancelled. Margin $${order.marginUSD.toFixed(2)} released.`, 'info');
+                saveState();
+            } else {
+                log(`ERROR: Pending order with ID ending in ${idPart} not found.`, 'error');
+            }
+            updateUI();
+        }
+
+        // Closes an active position
+        window.closePosition = function(fullId) {
+            const index = window.botState.positions.findIndex(p => p.id === fullId);
+            
+            if (index !== -1) {
+                const pos = window.botState.positions[index];
+                const currentPrice = window.btcPrice;
+                const direction = (pos.type === 'long' ? 1 : -1);
+                const pnlRaw = (currentPrice - pos.entryPrice) * pos.amountBTC * pos.leverage * direction;
+
+                window.botState.balance += pos.marginUSD; // Return margin used
+                window.botState.balance += pnlRaw; // Apply PnL
+                window.botState.positions.splice(index, 1);
+                
+                const logType = pnlRaw >= 0 ? 'success' : 'error';
+                log(`CLOSED: ${pos.type.toUpperCase()} ID ${pos.id.substring(pos.id.length - 4)} manually closed at $${currentPrice.toFixed(2)}. PnL: $${pnlRaw.toFixed(2)}`, logType);
+                
+                // Update cumulative loss tracker if it was a loss
+                if (pnlRaw < 0) {
+                    window.botState.cumulativeLoss += Math.abs(pnlRaw);
+                }
+
+                saveState();
+            } else {
+                log(`ERROR: Active Position with ID ending in ${fullId.substring(fullId.length - 4)} not found.`, 'error');
+            }
+            updateUI();
+        }
+
+        // --- Event Listeners and Initializers ---
+
+        // Wait for the DOM to fully load before initializing Firebase and the UI
+        document.addEventListener('DOMContentLoaded', () => {
+            // Setup command input listener
+            const commandInput = document.getElementById('command-input');
+            const commandButton = document.getElementById('command-execute');
+
+            const handleExecute = () => {
+                const command = commandInput.value;
+                if (command) {
+                    window.executeTrade(command);
+                    commandInput.value = ''; // Clear input after execution
+                }
+            };
+
+            commandButton.addEventListener('click', handleExecute);
+            commandInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleExecute();
+                }
+            });
+            
+            // Start the main loop
+            initializeFirebase().then(() => {
+                startPriceLoop();
+            }).catch(e => {
+                log(`Initialization failed: ${e.message}`, 'error');
+            });
+        });
+    </script>
+
+
+    <div class="max-w-6xl mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">Obsession Trading Academy</h1>
+            <p class="text-gray-400">
+                A sandbox for practicing leveraged crypto trading and risk management.
+                We believe in responsible crypto education without hype.
+            </p>
+            <div class="bg-blue-900/20 border border-blue-600/50 p-4 rounded-lg mt-4 text-sm">
+                <p class="font-semibold text-blue-300">**FULL REALISM:** Supports Limit Orders, Stop Orders, Liquidation, and your rule (no execution on exact price match).</p>
+                <p class="mt-1 text-gray-300">Your Unique User ID: <span id="user-id">Loading...</span></p>
+                <script>
+                    document.getElementById('user-id').textContent = typeof __initial_auth_token !== 'undefined' ? (typeof __initial_auth_token === 'string' ? 'Authenticated' : 'Anonymous') : 'Anonymous/Local';
+                </script>
+            </div>
+        </header>
+
+        <!-- Stats Grid (4 columns now for risk history) -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <!-- Available Balance -->
+            <div class="card text-center">
+                <h2 class="text-lg font-semibold text-gray-400 mb-2">Available Balance (USD)</h2>
+                <div id="current-balance" class="text-4xl font-extrabold text-yellow-500">$10000.00</div>
+            </div>
+
+            <!-- Current BTC Price -->
+            <div class="card text-center">
+                <h2 class="text-lg font-semibold text-gray-400 mb-2">Current BTC Price</h2>
+                <div id="btc-price-display" data-last-price="0" class="text-4xl font-extrabold text-white">Loading Price...</div>
+                <p id="btc-price-source" class="text-sm text-gray-500 mt-1"></p>
+            </div>
+
+            <!-- Total Unrealized P&L -->
+            <div class="card text-center">
+                <h2 class="text-lg font-semibold text-gray-400 mb-2">Unrealized P&L</h2>
+                <div id="unrealized-pnl" class="text-4xl font-extrabold text-green-500">+$0.00</div>
+            </div>
+
+            <!-- Cumulative Loss (New) -->
+            <div class="card text-center bg-red-900/20">
+                <h2 class="text-lg font-semibold text-red-400 mb-2">Total Energy Lost (Sim. Loss)</h2>
+                <div id="cumulative-loss" class="text-4xl font-extrabold text-red-500">-$0.00</div>
+            </div>
+            
+        </div>
+        
+        <!-- Risk History Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="card text-center bg-red-900/20">
+                <h2 class="text-lg font-semibold text-red-400 mb-2">Total Liquidations (The Hard Lesson)</h2>
+                <div id="total-liquidations" class="text-4xl font-extrabold text-red-500">0</div>
+                <p class="text-sm text-red-300 mt-2">Each liquidation means 100% loss of margin for that trade.</p>
+            </div>
+            
+            <div class="card text-center bg-gray-800/50">
+                <h2 class="text-lg font-semibold text-gray-400 mb-2">Simulator Start Balance</h2>
+                <div class="text-4xl font-extrabold text-gray-300">$10000.00</div>
+                <p class="text-sm text-gray-500 mt-2">This is your starting capital for reference.</p>
+            </div>
+        </div>
+
+        <!-- Open Positions & Pending Orders -->
+        <div class="card mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-white">Open Positions & Pending Orders</h2>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-700">
+                    <thead>
+                        <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            <th class="p-3">ID (LAST 4)</th>
+                            <th class="p-3">TYPE / LEVERAGE</th>
+                            <th class="p-3">MARGIN (USD)</th>
+                            <th class="p-3">ENTRY/LIMIT PRICE</th>
+                            <th class="p-3">P&L (USD) / STATUS</th>
+                            <th class="p-3">ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-body" class="divide-y divide-gray-800">
+                        <!-- Position rows will be injected here -->
+                        <tr><td colspan="6" class="p-4 text-center text-gray-400">Loading state...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Command Input -->
+        <div class="card mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-white">Commands (Trade Setup: [Margin] [Entry Price] [TP Price] [SL Price] [Leverage])</h2>
+            
+            <div class="command-usage mb-4">
+                <h3 class="font-bold text-lg text-white mb-2">LIMIT ORDERS (Buy Low, Sell High) - Default</h3>
+                <p class="text-gray-400 text-sm mb-2">
+                    Wait for price to drop (BUY) or rise (SELL) to the entry price. 
+                    <span class="font-bold text-yellow-400">**Crucially, does not execute if price == Entry Price.**</span>
+                </p>
+                <code class="block text-green-400 text-sm">/buy 500 80000 88000 75000 10x</code>
+                <span class="text-xs text-gray-500">(Buy Limit: Executes if price drops BELOW 80000)</span>
+                <code class="block text-red-400 text-sm mt-2">/sell 500 95000 85000 98000 10x</code>
+                <span class="text-xs text-gray-500">(Sell Limit: Executes if price rises ABOVE 95000)</span>
+            </div>
+
+            <div class="command-usage mb-4">
+                <h3 class="font-bold text-lg text-white mb-2">STOP ORDERS (Buy High, Sell Low) - Momentum/Breakout</h3>
+                <p class="text-gray-400 text-sm mb-2">
+                    Wait for price to rise (BUYSTOP) or drop (SELLSTOP) through the entry price. 
+                    <span class="font-bold text-yellow-400">**Crucially, does not execute if price == Entry Price.**</span>
+                </p>
+                <code class="block text-green-400 text-sm">/buystop 500 92000 98000 88000 10x</code>
+                <span class="text-xs text-gray-500">(Buy Stop: Executes if price rises ABOVE 92000)</span>
+                <code class="block text-red-400 text-sm mt-2">/sellstop 500 88000 82000 92000 10x</code>
+                <span class="text-xs text-gray-500">(Sell Stop: Executes if price drops BELOW 88000)</span>
+            </div>
+
+            <div class="flex space-x-2">
+                <input type="text" id="command-input" placeholder="/buy 500 80000 88000 75000 10x" 
+                       class="flex-grow bg-gray-700 text-white p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="command-execute" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-md shadow-blue-900/50">
+                    Execute
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Use /close [ID] to manually close an open position, or /cancel [ID] to cancel a pending order. Use /portfolio to refresh.</p>
+        </div>
+
+        <!-- Protocol Log -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4 text-white">Bot Protocol Log</h2>
+            <div id="protocol-log" class="protocol-log text-sm">
+                <!-- Log entries will be prepended here -->
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

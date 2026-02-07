@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsession Trader mit Hebel</title>
+    <!-- Tailwind CSS CDN für das Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Konfiguriert Tailwind um "Inter" als Standard-Schriftart zu verwenden
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+    <!-- Google Font Import für "Inter" -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Dunkler Hintergrund */
+        }
+        /* Stellt sicher, dass die App den gesamten Viewport ausfüllt */
+        app-root {
+            display: block;
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <!-- Der Selector der Angular-Komponente -->
+    <app-root></app-root>
+
+    <!--
+      ----------------------------------------------------------------------
+      FIREBASE UND ANGULAR IMPORTE
+      Dies lädt alle notwendigen Bibliotheken (Firebase, Angular/core)
+      und die App-Komponente selbst.
+      ----------------------------------------------------------------------
+    -->
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, where } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+        
+        // Angular Standalone Componente Imports
+        import { bootstrapApplication, ChangeDetectionStrategy, Component, signal, computed, effect } from 'https://cdn.jsdelivr.net/npm/@angular/core@17.0.0/fesm2022/core.mjs';
+        import { FormsModule } from 'https://cdn.jsdelivr.net/npm/@angular/forms@17.0.0/fesm2022/forms.mjs';
+
+        // ----------------------------------------------------------------------
+        // DEFINTION DER ANGULAR KOMPONENTE (Inhalt von trading_bot.ts)
+        // ----------------------------------------------------------------------
+
+        // Globale Variablen aus der Canvas-Umgebung
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- Typdefinitionen ---
+        interface Trade {
+          id: number;
+          type: 'LONG' | 'SHORT';
+          amountUsd: number;
+          entryPrice: number;
+          tpPrice: number;
+          slPrice: number;
+          leverage: number; // Neu: Hebel (z.B. 5, 10, 20)
+          amountBtc: number;
+          openTime: string;
+          isOpen: boolean;
+        }
+
+        interface Wallet {
+          balance: number;
+          nextTradeId: number;
+        }
+
+        // --- Hilfsfunktionen ---
+        // Konvertiert den Hebel-String (z.B. "5x") in eine Zahl (5)
+        function parseLeverage(leverageStr: string): number | null {
+          const match = leverageStr.match(/(\d+)x$/);
+          return match ? parseInt(match[1], 10) : null;
+        }
+
+        // --- Hauptkomponente ---
+        @Component({
+          selector: 'app-root',
+          standalone: true, // Wichtig für die bootstrapApplication
+          imports: [FormsModule], // Für [(ngModel)]
+          template: `
+            <div class="min-h-screen bg-gray-900 text-white p-4 sm:p-6 lg:p-8 font-mono">
+              <div class="max-w-4xl mx-auto">
+                <h1 class="text-3xl font-bold mb-6 text-green-400">Obsession Trader (mit Hebel)</h1>
+                
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-6 border border-gray-700">
+                  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                    <p class="text-xl">💰 Virtuelles Guthaben: <span class="font-bold text-yellow-400">\${{ wallet().balance.toFixed(2) }}</span></p>
+                    <p class="text-lg">⚡ Aktueller BTC-Preis: <span class="font-bold text-blue-400">\${{ currentPrice().toFixed(2) }}</span></p>
+                  </div>
+                  <p class="text-sm text-gray-500 mt-2">Nutzer ID (für Debug/Support): {{ userId() || 'Wird geladen...' }}</p>
+
+                  <div class="mt-4 pt-4 border-t border-gray-700">
+                    <h2 class="text-xl font-semibold mb-3 text-green-300">Befehle (mit Hebel):</h2>
+                    <pre class="bg-gray-700 p-3 rounded-lg overflow-x-auto text-sm">
+/buy [Betrag_USD] [Einstiegspreis] [TP_Preis] [SL_Preis] [Hebel_x]
+/sell [Betrag_USD] [Einstiegspreis] [TP_Preis] [SL_Preis] [Hebel_x]
+
+Beispiel: /buy 500 90618 92618 89618 10x
+                    </pre>
+                    <p class="text-xs text-gray-400 mt-2">Der Hebel (z.B. 5x, 10x) multipliziert den Positionsbetrag.</p>
+                  </div>
+                </div>
+
+                <!-- Befehls-Eingabe -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-6 border border-gray-700">
+                  <label for="command-input" class="block text-lg font-medium mb-2 text-green-300">Geben Sie einen Befehl ein:</label>
+                  <div class="flex space-x-2">
+                    <input 
+                      id="command-input"
+                      [(ngModel)]="commandInput" 
+                      (keyup.enter)="executeCommand()"
+                      class="flex-grow p-3 rounded-lg bg-gray-700 border border-gray-600 focus:ring-green-500 focus:border-green-500"
+                      placeholder="/buy 1000 90000 95000 88000 5x"
+                    >
+                    <button 
+                      (click)="executeCommand()"
+                      [disabled]="!isAuthReady() || isProcessing()"
+                      class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 disabled:opacity-50"
+                    >
+                      Ausführen
+                    </button>
+                  </div>
+                  <div *ngIf="message()" class="mt-4 p-3 rounded-lg" [ngClass]="message().type === 'error' ? 'bg-red-900 text-red-300' : 'bg-blue-900 text-blue-300'">
+                    {{ message().text }}
+                  </div>
+                </div>
+
+                <!-- Portfolio-Anzeige -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                  <h2 class="text-2xl font-bold mb-4 text-green-400">Offenes Portfolio ({{ openTrades().length }})</h2>
+                  
+                  @if (openTrades().length === 0) {
+                    <div class="text-gray-400 italic p-4 bg-gray-700 rounded-lg text-center">
+                      Keine offenen Trades.
+                    </div>
+                  } @else {
+                    @for (trade of openTrades(); track trade.id) {
+                      <div class="mb-4 p-4 rounded-xl bg-gray-700 border border-gray-600 shadow-md">
+                        <div class="flex justify-between items-center mb-2">
+                          <span class="text-lg font-bold" [ngClass]="trade.type === 'LONG' ? 'text-green-400' : 'text-red-400'">
+                            {{ trade.type }} | ID: {{ trade.id }}
+                          </span>
+                          <button 
+                            (click)="closeTrade(trade.id)"
+                            class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-3 rounded-lg transition duration-300"
+                          >
+                            Schließen
+                          </button>
+                        </div>
+                        
+                        <p>Einstieg: \${{ trade.entryPrice.toFixed(2) }} ({{ trade.leverage }}x Hebel)</p>
+                        <p>Betrag: {{ trade.amountBtc.toFixed(4) }} BTC (\${{ trade.amountUsd.toFixed(2) }} Marge)</p>
+                        <p>TP/SL: \${{ trade.tpPrice.toFixed(2) }} / \${{ trade.slPrice.toFixed(2) }}</p>
+                        
+                        <div class="mt-2 pt-2 border-t border-gray-600">
+                          <p class="font-semibold" [ngClass]="getPLColor(trade)">
+                            Unrealisierter P&L: \${{ calculatePnL(trade).toFixed(2) }}
+                          </p>
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              </div>
+            </div>
+          `,
+          styles: [`
+            /* Fügen Sie hier zusätzliche Styles hinzu, falls nötig */
+          `],
+          changeDetection: ChangeDetectionStrategy.OnPush,
+        })
+        class App {
+          // Firebase und Auth Signale
+          private app;
+          private db;
+          private auth;
+          
+          userId = signal(null);
+          isAuthReady = signal(false);
+          
+          // App-State Signale
+          commandInput = '';
+          message = signal(null);
+          isProcessing = signal(false);
+
+          // Handels-Signale
+          wallet = signal({ balance: 10000.00, nextTradeId: 1 });
+          trades = signal([]);
+          currentPrice = signal(90618.34); // Simulierter BTC-Preis
+
+          openTrades = computed(() => this.trades().filter(t => t.isOpen));
+
+          constructor() {
+            this.initFirebase();
+            this.initSimulatedPriceFeed();
+
+            // Reagiere auf abgeschlossene Authentifizierung, um Daten zu laden
+            effect(() => {
+              if (this.isAuthReady() && this.userId()) {
+                this.loadInitialData();
+                this.setupRealtimeListeners();
+              }
+            });
+          }
+
+          // --- Firebase Initialisierung und Authentifizierung ---
+          initFirebase() {
+            if (Object.keys(firebaseConfig).length > 0) {
+              this.app = initializeApp(firebaseConfig);
+              this.db = getFirestore(this.app);
+              this.auth = getAuth(this.app);
+            } else {
+                console.error("Firebase Config nicht gefunden. App läuft im in-memory Modus.");
+                this.auth = getAuth(this.app); // Mock Auth instance
+                this.isAuthReady.set(true);
+                this.userId.set(crypto.randomUUID());
+                return;
+            }
+
+            onAuthStateChanged(this.auth, (user) => {
+              if (user) {
+                this.userId.set(user.uid);
+              } else {
+                this.userId.set(crypto.randomUUID()); // Anonyme ID, falls Auth fehlschlägt
+              }
+              this.isAuthReady.set(true);
+            });
+
+            if (initialAuthToken) {
+              signInWithCustomToken(this.auth, initialAuthToken).catch(error => {
+                console.error("Fehler bei signInWithCustomToken:", error);
+                signInAnonymously(this.auth);
+              });
+            } else {
+              signInAnonymously(this.auth);
+            }
+          }
+
+          getWalletDocRef(userId) {
+            if (!this.db) throw new Error("Firestore nicht initialisiert.");
+            // Private Daten: /artifacts/{appId}/users/{userId}/wallet/main
+            return doc(this.db, `artifacts/${appId}/users/${userId}/wallet/main`);
+          }
+
+          getTradesCollectionRef(userId) {
+            if (!this.db) throw new Error("Firestore nicht initialisiert.");
+            // Private Daten: /artifacts/{appId}/users/{userId}/trades
+            return collection(this.db, `artifacts/${appId}/users/${userId}/trades`);
+          }
+
+          async loadInitialData() {
+            const userId = this.userId();
+            if (!this.db || !userId) return;
+
+            // 1. Wallet laden oder erstellen
+            const walletDocRef = this.getWalletDocRef(userId);
+            const walletSnap = await getDoc(walletDocRef);
+
+            if (walletSnap.exists()) {
+              const data = walletSnap.data();
+              this.wallet.set(data);
+            } else {
+              // Wallet erstellen
+              await setDoc(walletDocRef, this.wallet());
+            }
+          }
+
+          setupRealtimeListeners() {
+            const userId = this.userId();
+            if (!this.db || !userId) return;
+
+            // Listener für Trades
+            onSnapshot(this.getTradesCollectionRef(userId), (snapshot) => {
+              const tradesData = [];
+              snapshot.forEach(doc => {
+                tradesData.push(doc.data());
+              });
+              // Trades nach ID sortieren
+              tradesData.sort((a, b) => a.id - b.id);
+              this.trades.set(tradesData);
+            }, error => {
+              console.error("Fehler beim Trades Listener:", error);
+            });
+
+            // Listener für Wallet (falls es von einem anderen Prozess geändert wird)
+            onSnapshot(this.getWalletDocRef(userId), (doc) => {
+              if (doc.exists()) {
+                this.wallet.set(doc.data());
+              }
+            }, error => {
+              console.error("Fehler beim Wallet Listener:", error);
+            });
+          }
+
+          // --- Simulations-Logik ---
+          initSimulatedPriceFeed() {
+            // Simuliert eine realistische (wenn auch einfache) Preisbewegung
+            setInterval(() => {
+              const current = this.currentPrice();
+              // Leichte Zufallsbewegung (max +/- 0.1% pro Sekunde)
+              const volatility = current * 0.001 * (Math.random() - 0.5); 
+              const newPrice = current + volatility;
+              this.currentPrice.set(newPrice);
+              this.checkTradeExits(); // Prüft bei jeder Preisänderung auf SL/TP
+            }, 1000);
+          }
+
+          // Überprüft automatisch SL/TP bei jeder Preisänderung (muss von der Hauptlogik aufgerufen werden)
+          checkTradeExits() {
+            const price = this.currentPrice();
+            const currentTrades = this.trades();
+            const userId = this.userId();
+            if (!this.db || !userId) return;
+
+            // Da dies eine einfache Simulation ist, prüfen wir alle Trades bei jedem Preis-Tick
+            currentTrades.forEach(trade => {
+              if (trade.isOpen) {
+                let shouldClose = false;
+                let reason = '';
+
+                if (trade.type === 'LONG') {
+                  // Long: Schließen bei SL (Preis <= SL) oder TP (Preis >= TP)
+                  if (price <= trade.slPrice) {
+                    shouldClose = true;
+                    reason = 'SL erreicht';
+                  } else if (price >= trade.tpPrice) {
+                    shouldClose = true;
+                    reason = 'TP erreicht';
+                  }
+                } else if (trade.type === 'SHORT') {
+                  // Short: Schließen bei SL (Preis >= SL) oder TP (Preis <= TP)
+                  if (price >= trade.slPrice) {
+                    shouldClose = true;
+                    reason = 'SL erreicht';
+                  } else if (price <= trade.tpPrice) {
+                    shouldClose = true;
+                    reason = 'TP erreicht';
+                  }
+                }
+
+                if (shouldClose) {
+                  this.performCloseTrade(trade, reason);
+                }
+              }
+            });
+          }
+
+          // PnL Berechnung
+          calculatePnL(trade) {
+            const price = this.currentPrice();
+            let pnl = 0;
+
+            if (trade.type === 'LONG') {
+              pnl = (price - trade.entryPrice) * trade.amountBtc;
+            } else if (trade.type === 'SHORT') {
+              pnl = (trade.entryPrice - price) * trade.amountBtc;
+            }
+            // amountBtc wurde bereits als effektive Markt-Exposure berechnet (Margin * Leverage / EntryPrice)
+            return pnl;
+          }
+
+          getPLColor(trade) {
+            const pnl = this.calculatePnL(trade);
+            if (pnl > 0) return 'text-green-500';
+            if (pnl < 0) return 'text-red-500';
+            return 'text-white';
+          }
+
+          // --- Befehls-Parser und Handler ---
+
+          displayMessage(text, type = 'success') {
+            this.message.set({ text, type });
+            setTimeout(() => this.message.set(null), 5000);
+          }
+
+          async executeCommand() {
+            if (!this.isAuthReady() || this.isProcessing()) return;
+            this.isProcessing.set(true);
+            this.message.set(null); // Nachricht zurücksetzen
+
+            const parts = this.commandInput.trim().toLowerCase().split(/\s+/);
+            const command = parts[0];
+            const args = parts.slice(1);
+            
+            try {
+              if (command === '/buy' || command === '/sell') {
+                await this.handleTradeCommand(command, args);
+              } else if (command === '/close') {
+                const tradeId = parseInt(args[0], 10);
+                if (isNaN(tradeId)) {
+                    this.displayMessage('Ungültige Trade ID. Beispiel: /close 1', 'error');
+                } else {
+                    await this.closeTrade(tradeId);
+                }
+              } else if (command === '/portfolio') {
+                this.displayMessage(`Offene Trades: ${this.openTrades().length}. Details siehe unten im Portfolio.`, 'success');
+              } else if (command === '/report') {
+                this.displayMessage('Derzeit nicht implementiert. Fokus liegt auf Handel.', 'error');
+              } else {
+                this.displayMessage('Unbekannter Befehl. Verfügbar: /buy, /sell, /portfolio, /close.', 'error');
+              }
+            } catch (e) {
+              console.error('Fehler bei Befehlsausführung:', e);
+              this.displayMessage(`Fehler: ${e.message}`, 'error');
+            } finally {
+              this.isProcessing.set(false);
+              this.commandInput = ''; // Eingabe löschen
+            }
+          }
+
+          async handleTradeCommand(command, args) {
+            if (args.length !== 5) {
+              throw new Error(`Ungültige Anzahl von Argumenten für ${command}. Benötigt: [Betrag_USD] [Einstiegspreis] [TP_Preis] [SL_Preis] [Hebel_x].`);
+            }
+
+            const [amountStr, entryStr, tpStr, slStr, leverageStr] = args;
+
+            const amountUsd = parseFloat(amountStr);
+            const entryPrice = parseFloat(entryStr);
+            const tpPrice = parseFloat(tpStr);
+            const slPrice = parseFloat(slStr);
+            const leverage = parseLeverage(leverageStr);
+
+            if (isNaN(amountUsd) || isNaN(entryPrice) || isNaN(tpPrice) || isNaN(slPrice) || !leverage || leverage <= 0) {
+              throw new Error('Ungültige Zahl(en) oder Hebel-Format (muss z.B. 5x sein).');
+            }
+            
+            const userId = this.userId();
+            const wallet = this.wallet();
+
+            // Berechnung der Marge (Margin)
+            const requiredMargin = amountUsd; 
+            const effectiveExposure = amountUsd * leverage; // Der tatsächliche Wert der Position am Markt
+
+            if (requiredMargin > wallet.balance) {
+              throw new Error(`Nicht genügend Guthaben. Benötigte Marge: \${${requiredMargin.toFixed(2)}}. Aktuelles Guthaben: \${${wallet.balance.toFixed(2)}}.`);
+            }
+
+            // Positionsgröße in BTC basierend auf der effektiven Markt-Exposure
+            const amountBtc = effectiveExposure / entryPrice;
+
+            const newTrade = {
+              id: wallet.nextTradeId,
+              type: command === '/buy' ? 'LONG' : 'SHORT',
+              amountUsd: amountUsd, // Die eingesetzte Marge (Betrag USD)
+              entryPrice: entryPrice,
+              tpPrice: tpPrice,
+              slPrice: slPrice,
+              leverage: leverage,
+              amountBtc: amountBtc, // Die tatsächliche BTC-Menge am Markt (Margin * Hebel / Preis)
+              openTime: new Date().toISOString(),
+              isOpen: true,
+            };
+
+            // Wallet aktualisieren: Guthaben reduzieren um die Marge, nächste ID erhöhen
+            const newWallet = {
+              balance: wallet.balance - requiredMargin,
+              nextTradeId: wallet.nextTradeId + 1,
+            };
+
+            // Trades und Wallet speichern
+            await setDoc(this.getWalletDocRef(userId), newWallet);
+            await setDoc(doc(this.getTradesCollectionRef(userId), newTrade.id.toString()), newTrade);
+
+            this.displayMessage(
+              `${command.toUpperCase()} Order Ausgeführt (${newTrade.type} ${leverage}x)! ID: ${newTrade.id}.` +
+              ` Marge: \${${requiredMargin.toFixed(2)}}, Effektive Position: \${${effectiveExposure.toFixed(2)}}.`,
+              'success'
+            );
+          }
+
+          async closeTrade(tradeId) {
+            const userId = this.userId();
+            const currentTrades = this.trades();
+            if (!this.db || !userId) return;
+
+            const trade = currentTrades.find(t => t.id === tradeId && t.isOpen);
+
+            if (!trade) {
+              this.displayMessage(`Trade ID ${tradeId} nicht gefunden oder bereits geschlossen.`, 'error');
+              return;
+            }
+
+            this.performCloseTrade(trade, 'Manuell geschlossen');
+          }
+
+          async performCloseTrade(trade, reason) {
+            const userId = this.userId();
+            const wallet = this.wallet();
+            if (!this.db || !userId) return;
+
+            // 1. P&L berechnen
+            const pnl = this.calculatePnL(trade);
+
+            // 2. Gewinn/Verlust zum Guthaben hinzufügen (Marge + PnL)
+            const marginReturned = trade.amountUsd; // Marge kommt IMMER zurück
+            const newBalance = wallet.balance + marginReturned + pnl;
+
+            // 3. Trade als geschlossen markieren (mit merge)
+            const closedTradeDocRef = doc(this.getTradesCollectionRef(userId), trade.id.toString());
+            await setDoc(closedTradeDocRef, { ...trade, isOpen: false, closeReason: reason, closePrice: this.currentPrice(), realizedPnl: pnl }, { merge: true });
+
+            // 4. Wallet aktualisieren
+            const newWallet = {
+              balance: newBalance,
+              nextTradeId: wallet.nextTradeId, 
+            };
+            await setDoc(this.getWalletDocRef(userId), newWallet);
+
+            this.displayMessage(
+              `Trade ID ${trade.id} geschlossen (${reason}). Realisierter P&L: \${${pnl.toFixed(2)}}. ` +
+              `Neues Guthaben: \${${newBalance.toFixed(2)}}.`,
+              pnl >= 0 ? 'success' : 'error'
+            );
+          }
+        }
+        
+        // Startet die Angular-Anwendung
+        bootstrapApplication(App);
+
+    </script>
+</body>
+</html>

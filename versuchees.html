@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Obsession Academy - Volatility Lesson</title>
+    <style>
+        :root { --gold: #f2a900; --warm: #ff4e50; --neon: #39ff14; }
+        body { background: #0d0d0d; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: #151515; border: 1px solid var(--gold); border-radius: 15px; padding: 30px; width: 480px; box-shadow: 0 0 40px rgba(242,169,0,0.1); }
+        .scenario { padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #333; background: #1a1a1a; }
+        .market { border-left-color: var(--warm); }
+        .limit { border-left-color: var(--gold); }
+        .tag { font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 3px; float: right; }
+        .profit { color: var(--neon); font-weight: bold; font-size: 20px; }
+        .loss { color: var(--warm); font-weight: bold; font-size: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h3 style="text-align:center; color:var(--gold); margin-top:0;">NEWS EVENT: BTC JUMPS 5%</h3>
+    
+    <div class="scenario market">
+        <span class="tag" style="background:var(--warm); color:white;">TAKER (MARKET)</span>
+        <div style="font-weight:bold; margin-bottom:5px;">Action: Buy Immediately</div>
+        <div style="font-size:13px; color:#aaa;">Fee: $60.00 (High)</div>
+        <div style="font-size:13px; color:#aaa;">Status: <span style="color:var(--neon)">FILLED INSTANTLY</span></div>
+        <div style="margin-top:10px;">Net Profit: <span class="profit">+$440.00</span></div>
+    </div>
+
+    <div class="scenario limit">
+        <span class="tag" style="background:var(--gold); color:black;">MAKER (LIMIT)</span>
+        <div style="font-weight:bold; margin-bottom:5px;">Action: Wait for $69,900</div>
+        <div style="font-size:13px; color:#aaa;">Fee: $40.00 (Low)</div>
+        <div style="font-size:13px; color:#aaa;">Status: <span style="color:var(--warm)">NOT FILLED (Price missed by $5)</span></div>
+        <div style="margin-top:10px;">Net Profit: <span class="loss">$0.00</span></div>
+    </div>
+
+    <p style="font-size: 11px; color: #555; text-align: center; font-style: italic;">
+        Lesson: Sometimes paying a higher fee is "cheaper" than missing the trade.
+    </p>
+</div>
+
+</body>
+</html>
+
+

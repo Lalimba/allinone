@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsession Trading Academy - Comparison Battle</title>
+    <style>
+        :root {
+            --bg: #0b061a;
+            --card: #150f2d;
+            --accent: #7b4dff;
+            --btc-gold: #f7931a;
+            --text: #ffffff;
+            --green: #2ecc71;
+            --highlight: #00f2ff;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            background-color: var(--card);
+            padding: 25px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 1100px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { color: #d1b3ff; margin: 0; font-size: 26px; text-transform: uppercase; }
+        .header h2 { color: var(--btc-gold); font-size: 16px; }
+
+        .comparison-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+
+        .column {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid rgba(123, 77, 255, 0.2);
+            transition: 0.3s;
+        }
+
+        .column.academy {
+            border-color: var(--btc-gold);
+            background: rgba(247, 147, 26, 0.03);
+        }
+
+        h3 { text-align: center; margin-top: 0; font-size: 20px; }
+        .standard-h { color: #aaa; }
+        .academy-h { color: var(--btc-gold); }
+
+        .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-size: 11px; color: #b3a4ff; margin-bottom: 4px; }
+        input { padding: 10px; border-radius: 8px; border: none; font-size: 14px; font-weight: bold; }
+
+        .results {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        .res-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .val { color: var(--highlight); font-weight: bold; }
+        .val-total { color: var(--green); font-weight: 900; }
+
+        .savings-box {
+            grid-column: span 2;
+            text-align: center;
+            background: linear-gradient(90deg, transparent, rgba(46, 204, 113, 0.2), transparent);
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 22px;
+            font-weight: bold;
+            color: var(--green);
+        }
+
+        .footer-icons { text-align: center; margin-top: 20px; font-size: 35px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Obsession Trading Academy</h1>
+        <h2>Mortgage Battle: Szenario A vs. Szenario B</h2>
+    </div>
+
+    <div class="comparison-wrapper">
+        <div class="column">
+            <h3 class="standard-h">Variante A (Standard)</h3>
+            <div class="input-grid">
+                <div class="input-group"><label>Kaufpreis</label><input type="number" id="p1" value="500000" oninput="calc()"></div>
+                <div class="input-group"><label>Eigenkapital</label><input type="number" id="e1" value="80000" oninput="calc()"></div>
+                <div class="input-group"><label>Zins %</label><input type="number" id="i1" value="3.5" step="0.1" oninput="calc()"></div>
+                <div class="input-group"><label>Dauer (Jahre)</label><input type="number" id="y1" value="30" oninput="calc()"></div>
+                <div class="input-group"><label>Sondertilgung %</label><input type="number" id="s1" value="0" oninput="calc()"></div>
+                <div class="input-group"><label>Nebenkosten %</label><input type="number" id="f1" value="10" oninput="calc()"></div>
+            </div>
+            <div class="results">
+                <div class="res-row"><span>Rate:</span> <span class="val" id="r1">0 €</span></div>
+                <div class="res-row"><span>Zinsen:</span> <span class="val" id="z1" style="color:#ff4d4d">0 €</span></div>
+                <div class="res-row"><span>Gesamt bezahlt:</span> <span class="val-total" id="t1">0 €</span></div>
+            </div>
+        </div>
+
+        <div class="column academy">
+            <h3 class="academy-h">Variante B (Academy)</h3>
+            <div class="input-grid">
+                <div class="input-group"><label>Kaufpreis</label><input type="number" id="p2" value="500000" oninput="calc()"></div>
+                <div class="input-group"><label>Eigenkapital</label><input type="number" id="e2" value="80000" oninput="calc()"></div>
+                <div class="input-group"><label>Zins %</label><input type="number" id="i2" value="3.5" step="0.1" oninput="calc()"></div>
+                <div class="input-group"><label>Dauer (Jahre)</label><input type="number" id="y2" value="30" oninput="calc()"></div>
+                <div class="input-group"><label>Sondertilgung %</label><input type="number" id="s2" value="2" oninput="calc()"></div>
+                <div class="input-group"><label>Nebenkosten %</label><input type="number" id="f2" value="10" oninput="calc()"></div>
+            </div>
+            <div class="results">
+                <div class="res-row"><span>Rate:</span> <span class="val" id="r2">0 €</span></div>
+                <div class="res-row"><span>Zinsen:</span> <span class="val" id="z2" style="color:#ff4d4d">0 €</span></div>
+                <div class="res-row"><span>Gesamt bezahlt:</span> <span class="val-total" id="t2">0 €</span></div>
+            </div>
+        </div>
+
+        <div class="savings-box">
+            Deine Ersparnis mit Variante B: <span id="save">0 €</span> 🚀
+        </div>
+    </div>
+
+    <div class="footer-icons">🏠 ₿ 🚗</div>
+</div>
+
+<script>
+function singleCalc(p, e, iYear, y, sYear, f) {
+    let fees = p * (f / 100);
+    let loan = (p + fees) - e;
+    let iMonth = (iYear / 100) / 12;
+    let totalMonths = y * 12;
+    
+    if (loan <= 0) return {rate: 0, totalInt: 0, totalPaid: 0};
+
+    let rate = loan * (iMonth * Math.pow(1 + iMonth, totalMonths)) / (Math.pow(1 + iMonth, totalMonths) - 1);
+    let roundedRate = Math.round(rate * 100) / 100;
+
+    let balance = loan;
+    let totalInt = 0;
+    let totalPaid = 0;
+
+    for (let i = 1; i <= totalMonths; i++) {
+        if (balance <= 0) break;
+        let mInt = balance * iMonth;
+        totalInt += mInt;
+        let principal = roundedRate - mInt;
+        balance -= principal;
+        totalPaid += roundedRate;
+
+        if (i % 12 === 0 && balance > 0) {
+            let extra = balance * (sYear / 100);
+            balance -= extra;
+            totalPaid += extra;
+        }
+    }
+    return {rate: roundedRate, totalInt, totalPaid};
+}
+
+function calc() {
+    let resA = singleCalc(
+        parseFloat(document.getElementById('p1').value),
+        parseFloat(document.getElementById('e1').value),
+        parseFloat(document.getElementById('i1').value),
+        parseFloat(document.getElementById('y1').value),
+        parseFloat(document.getElementById('s1').value),
+        parseFloat(document.getElementById('f1').value)
+    );
+    let resB = singleCalc(
+        parseFloat(document.getElementById('p2').value),
+        parseFloat(document.getElementById('e2').value),
+        parseFloat(document.getElementById('i2').value),
+        parseFloat(document.getElementById('y2').value),
+        parseFloat(document.getElementById('s2').value),
+        parseFloat(document.getElementById('f2').value)
+    );
+
+    document.getElementById('r1').innerText = resA.rate.toLocaleString('de-DE') + " €";
+    document.getElementById('z1').innerText = Math.round(resA.totalInt).toLocaleString('de-DE') + " €";
+    document.getElementById('t1').innerText = Math.round(resA.totalPaid).toLocaleString('de-DE') + " €";
+
+    document.getElementById('r2').innerText = resB.rate.toLocaleString('de-DE') + " €";
+    document.getElementById('z2').innerText = Math.round(resB.totalInt).toLocaleString('de-DE') + " €";
+    document.getElementById('t2').innerText = Math.round(resB.totalPaid).toLocaleString('de-DE') + " €";
+
+    let saving = resA.totalPaid - resB.totalPaid;
+    document.getElementById('save').innerText = Math.round(saving).toLocaleString('de-DE') + " €";
+}
+calc();
+</script>
+
+</body>
+</html>

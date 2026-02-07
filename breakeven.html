@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obsession Trading Academy - Real Crypto Costs</title>
+<style>
+:root {
+--bg: #0b061a;
+--card: #150f2d;
+--accent: #7b4dff;
+--btc-gold: #f7931a;
+--text: #ffffff;
+--highlight: #00f2ff;
+--green: #2ecc71;
+--red: #ff4d4d;
+}
+body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 20px; margin: 0; }
+.container { background-color: var(--card); padding: 30px; border-radius: 20px; width: 100%; max-width: 650px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.05); }
+.header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid var(--accent); padding-bottom: 15px; }
+.header h1 { color: #d1b3ff; margin: 0; font-size: 1.8rem; text-transform: uppercase; letter-spacing: 2px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+.input-group { display: flex; flex-direction: column; }
+label { font-size: 0.8rem; color: #b3a4ff; margin-bottom: 5px; text-transform: uppercase; }
+input, select { padding: 12px; border-radius: 10px; border: none; font-size: 1rem; font-weight: bold; background: #ffffff; color: #150f2d; }
+.results { background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 15px; border-left: 5px solid var(--btc-gold); }
+.res-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 1.05rem; }
+.label-en { font-size: 0.75rem; color: #888; display: block; }
+.val { color: var(--highlight); font-weight: bold; }
+.val-be { color: var(--btc-gold); font-size: 1.3rem; font-weight: 900; }
+.fee-warning { font-size: 0.85rem; color: var(--red); text-align: center; margin-top: 15px; font-weight: bold; padding: 10px; border: 1px dashed var(--red); border-radius: 10px; display:none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+<div class="header">
+<h1>Obsession Trading Academy</h1>
+<h2>Crypto Break-Even & Real Fees</h2>
+</div>
+
+<div class="grid">
+<div class="input-group">
+<label>Asset / Coin</label>
+<select id="coin" onchange="calc()">
+<option value="BTC">Bitcoin (BTC)</option>
+<option value="ETH">Ethereum (ETH)</option>
+<option value="SOL">Solana (SOL)</option>
+</select>
+</div>
+<div class="input-group">
+<label>Exchange / Plattform</label>
+<select id="exchange" onchange="calc()">
+<option value="binance">Binance (Retail)</option>
+<option value="coinbase">Coinbase (Standard)</option>
+<option value="bitpanda">Bitpanda (App/Web)</option>
+<option value="tr">Trade Republic</option>
+<option value="bybit">Bybit</option>
+</select>
+</div>
+<div class="input-group">
+<label>Investment / Einsatz (€)</label>
+<input type="number" id="investment" value="1000" oninput="calc()">
+</div>
+<div class="input-group">
+<label>Buy Price / Kaufkurs (€)</label>
+<input type="number" id="buyPrice" value="65000" oninput="calc()">
+</div>
+</div>
+
+<div class="results">
+<div class="res-row">
+<span>Net Investment<br><span class="label-en">Netto-Einsatz</span></span>
+<span class="val" id="netInv">0 €</span>
+</div>
+<div class="res-row">
+<span>Total Fees (Buy+Sell+Spread)<br><span class="label-en">Gesamtkosten (Kauf+Verkauf+Spread)</span></span>
+<span class="val" id="totalFees" style="color: var(--red);">0 €</span>
+</div>
+<div class="res-row" style="background: rgba(247, 147, 26, 0.1); padding: 15px; border-radius: 10px; margin-top: 10px;">
+<span>BREAK-EVEN PRICE<br><span class="label-en">Kurs für 0€ Gewinn</span></span>
+<span class="val-be" id="bePrice">0 €</span>
+</div>
+<div class="res-row">
+<span>Profit at +10% Rise<br><span class="label-en">Gewinn bei +10% Kurs</span></span>
+<span class="val" id="profit10" style="color: var(--green);">0 €</span>
+</div>
+</div>
+
+<div id="warn" class="fee-warning">⚠️ Hohe Gebühren fressen dein Kapital! / High fees eating your capital!</div>
+</div>
+
+<script>
+// Angepasste Real-World Fees (Kauf + Verkauf + Spread Schätzung)
+const exchangeData = {
+binance: { feeRate: 0.005, spread: 0.001 }, // ca. 0.5% - 0.6% Gesamt
+coinbase: { feeRate: 0.0149, spread: 0.01 }, // Coinbase Standard ist teuer!
+bitpanda: { feeRate: 0.0149, spread: 0.018 }, // Bitpanda hat oft hohen Spread im Broker
+tr: { feeRate: 0.00, spread: 0.02, flat: 1.00 }, // 1€ Gebühr aber ca. 2% Spread
+bybit: { feeRate: 0.001, spread: 0.001 } // Sehr günstig
+};
+
+function calc() {
+const inv = parseFloat(document.getElementById('investment').value) || 0;
+const buyPrice = parseFloat(document.getElementById('buyPrice').value) || 0;
+const ex = exchangeData[document.getElementById('exchange').value];
+
+// Kosten für Kauf
+let buyCosts = (inv * ex.feeRate) + (inv * ex.spread) + (ex.flat || 0);
+// Wir berechnen Break-Even so: Man muss die Kaufkosten UND die späteren Verkaufskosten reinholen
+let totalFeesKombiniert = buyCosts * 2;
+const netInv = inv - buyCosts;
+const bePrice = buyPrice * (1 + (totalFeesKombiniert / inv));
+// Profit bei +10% Kursanstieg (nach Abzug ALLER Gebühren)
+const sellValue = (netInv * 1.1) - buyCosts;
+const pureProfit = sellValue - netInv - buyCosts;
+
+document.getElementById('netInv').innerText = netInv.toLocaleString('de-DE') + " €";
+document.getElementById('totalFees').innerText = totalFeesKombiniert.toLocaleString('de-DE') + " €";
+document.getElementById('bePrice').innerText = bePrice.toLocaleString('de-DE', {minimumFractionDigits: 2}) + " €";
+document.getElementById('profit10').innerText = pureProfit.toLocaleString('de-DE') + " €";
+
+const warn = document.getElementById('warn');
+warn.style.display = (totalFeesKombiniert / inv > 0.03) ? "block" : "none";
+}
+calc();
+</script>
+</body>
+</html>

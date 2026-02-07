@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Mortgage Calculator - Fixed Duration</title>
+    <style>
+        body { background-color: #0b061a; color: white; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .card { background: #150f2d; padding: 25px; border-radius: 15px; width: 100%; max-width: 800px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .input-box { display: flex; flex-direction: column; }
+        label { font-size: 12px; margin-bottom: 5px; color: #b3a4ff; }
+        input, select { padding: 10px; border-radius: 5px; border: none; font-size: 16px; }
+        button { background: #7b4dff; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
+        .result-area { margin-top: 20px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px; }
+        .highlight { color: #00ffcc; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Mortgage Calculator (Laufzeit-Fokus)</h2>
+    <div class="grid">
+        <div class="input-box">
+            <label>Kaufpreis (€)</label>
+            <input type="number" id="price" value="500000">
+        </div>
+        <div class="input-box">
+            <label>Eigenkapital (€)</label>
+            <input type="number" id="equity" value="80000">
+        </div>
+        <div class="input-box">
+            <label>Zinssatz (% p.a.)</label>
+            <input type="number" id="interest" step="0.1" value="3.5">
+        </div>
+        <div class="input-box">
+            <label>Wunsch-Laufzeit (Jahre)</label>
+            <input type="number" id="maxYears" value="30">
+        </div>
+        <div class="input-box">
+            <label>Nebenkosten (%)</label>
+            <input type="number" id="costs" value="10">
+        </div>
+        <div class="input-box">
+            <label>Sondertilgung (%/Jahr)</label>
+            <input type="number" id="extra" value="0">
+        </div>
+    </div>
+    
+    <button onclick="calculateMortgage()">BERECHNEN</button>
+
+    <div class="result-area" id="results">
+        <p>Kreditsumme: <span id="resLoan" class="highlight">0</span> €</p>
+        <p>Erforderliche Monatsrate: <span id="resMonthly" class="highlight">0</span> €</p>
+        <p>Gesamtkosten (inkl. Zinsen): <span id="resTotal" class="highlight">0</span> €</p>
+    </div>
+</div>
+
+<script>
+function calculateMortgage() {
+    const price = parseFloat(document.getElementById('price').value);
+    const equity = parseFloat(document.getElementById('equity').value);
+    const interestRateYear = parseFloat(document.getElementById('interest').value) / 100;
+    const years = parseFloat(document.getElementById('maxYears').value);
+    const extraCostsPercent = parseFloat(document.getElementById('costs').value) / 100;
+
+    // 1. Kreditsumme berechnen (Kaufpreis + Nebenkosten - Eigenkapital)
+    const totalExtraCosts = price * extraCostsPercent;
+    const loanAmount = (price + totalExtraCosts) - equity;
+
+    if (loanAmount <= 0) {
+        alert("Dein Eigenkapital deckt bereits alles!");
+        return;
+    }
+
+    // 2. Formel für die monatliche Rate bei fester Laufzeit (Annuität)
+    // Formel: R = P * (i * (1 + i)^n) / ((1 + i)^n - 1)
+    const i = interestRateYear / 12; // Monatlicher Zins
+    const n = years * 12; // Gesamte Monate
+    
+    let monthlyRate = loanAmount * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
+
+    // 3. Anzeige
+    document.getElementById('resLoan').innerText = Math.round(loanAmount).toLocaleString('de-DE');
+    document.getElementById('resMonthly').innerText = monthlyRate.toFixed(2).toLocaleString('de-DE');
+    document.getElementById('resTotal').innerText = Math.round(monthlyRate * n).toLocaleString('de-DE');
+}
+</script>
+
+</body>
+</html>

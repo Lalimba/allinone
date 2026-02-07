@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsession Trading Akademie - Finance Suite</title>
+    <style>
+        :root {
+            --bg: #0b061a;
+            --card: #150f2d;
+            --accent: #7b4dff;
+            --btc-gold: #f7931a;
+            --text: #ffffff;
+            --highlight: #00f2ff;
+            --label-video: #d1b3ff; /* Markierte Farbe für Video */
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 10% 20%, rgba(247, 147, 26, 0.1) 0%, transparent 20%),
+                              radial-gradient(circle at 90% 80%, rgba(123, 77, 255, 0.1) 0%, transparent 20%);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .main-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            width: 100%;
+            max-width: 1500px;
+        }
+
+        .container {
+            background-color: var(--card);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+        }
+
+        .header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+        .header h1 { color: var(--accent); margin: 0; font-size: 1.6rem; text-transform: uppercase; letter-spacing: 2px; }
+        .header h2 { color: var(--btc-gold); font-size: 1.1rem; margin-top: 5px; }
+
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .input-group { display: flex; flex-direction: column; }
+        
+        /* VIDEO OPTIMIERUNG: Labels groß und hell-violett markiert */
+        label { 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            margin-bottom: 6px; 
+            color: var(--label-video); 
+            text-shadow: 0 0 5px rgba(123, 77, 255, 0.4);
+        }
+
+        input { 
+            padding: 12px; border-radius: 8px; border: 1px solid #332a5a; 
+            background: #ffffff; color: #000; font-size: 1.1rem; font-weight: bold;
+        }
+
+        button {
+            grid-column: span 2;
+            background: linear-gradient(45deg, var(--accent), #5a2ed1);
+            color: white; padding: 15px; border: none; border-radius: 10px;
+            cursor: pointer; font-weight: bold; font-size: 1.1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-transform: uppercase;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(123, 77, 255, 0.4); }
+
+        .results {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px; border-radius: 15px;
+            border-left: 5px solid var(--btc-gold);
+        }
+
+        .res-row { 
+            display: flex; justify-content: space-between; 
+            padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 1.1rem;
+        }
+
+        .val { color: var(--highlight); font-weight: bold; }
+        .val-total { color: #2ecc71; font-weight: 900; }
+        .val-red { color: #ff4d4d; font-weight: bold; }
+        .btc-deco { color: var(--btc-gold); font-weight: bold; margin-right: 5px; }
+
+        .inflation-warning {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255, 77, 77, 0.1);
+            border: 1px dashed #ff4d4d;
+            border-radius: 10px;
+        }
+
+        @media (max-width: 1000px) { .main-wrapper { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="main-wrapper">
+    
+    <div class="container">
+        <div class="header">
+            <h1>OTA Mortgage</h1>
+            <h2>Hypothekenrechner</h2>
+        </div>
+        <div class="grid">
+            <div class="input-group"><label>Kaufpreis (€)</label><input type="number" id="price" value="500000"></div>
+            <div class="input-group"><label>Eigenkapital (€)</label><input type="number" id="equity" value="80000"></div>
+            <div class="input-group"><label>Zins (% p.a.)</label><input type="number" id="interest" step="0.01" value="3.5"></div>
+            <div class="input-group"><label>Laufzeit (Jahre)</label><input type="number" id="years" value="30"></div>
+            <div class="input-group"><label>Nebenkosten (%)</label><input type="number" id="costs" value="10"></div>
+            <div class="input-group"><label>Sondertilgung (%)</label><input type="number" id="extra" value="2"></div>
+            <button onclick="calc()">Berechnen / Calculate</button>
+        </div>
+        <div class="results">
+            <div class="res-row"><span><span class="btc-deco">₿</span> Kreditsumme:</span><span class="val" id="outLoan">0 €</span></div>
+            <div class="res-row"><span>Monatliche Rate:</span><span class="val" id="outRate">0 €</span></div>
+            <div class="res-row"><span>Gesamte Zinsen:</span><span class="val" id="outInt">0 €</span></div>
+            <div class="res-row"><span>Restbetrag:</span><span id="outRest" style="color: #ff4d4d; font-weight: bold;">0 €</span></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>Compound & Inflation</h1>
+            <h2>Zinseszins & Kaufkraft</h2>
+        </div>
+        <div class="grid">
+            <div class="input-group"><label>Startkapital (€)</label><input type="number" id="invStart" value="10000"></div>
+            <div class="input-group"><label>Monatl. Sparrate (€)</label><input type="number" id="invMonthly" value="500"></div>
+            <div class="input-group"><label>Rendite (% p.a.)</label><input type="number" id="invReturn" step="0.1" value="7.0"></div>
+            <div class="input-group"><label>Zeitraum (Jahre)</label><input type="number" id="invYears" value="30"></div>
+            <div class="input-group"><label>Inflation (% p.a.)</label><input type="number" id="invInf" step="0.1" value="2.5"></div>
+            <div class="input-group"><label>Steuersatz (%)</label><input type="number" id="invTax" value="25"></div>
+            <button onclick="calcInvestment()" style="background: linear-gradient(45deg, var(--btc-gold), #b36b00);">Investment Check</button>
+        </div>
+        <div class="results">
+            <div class="res-row"><span>Endbetrag (Nominal):</span><span class="val-total" id="outInvTotal">0 €</span></div>
+            <div class="res-row"><span>Eingezahlt gesamt:</span><span class="val" id="outInvPaid">0 €</span></div>
+            <div class="inflation-warning">
+                <div class="res-row" style="border:none; padding:0;">
+                    <span style="color:#ff4d4d; font-weight:bold;">Kaufkraft (Realwert):</span>
+                    <span class="val-red" id="outRealValue" style="font-size:1.4rem;">0 €</span>
+                </div>
+                <small style="color:#aaa;">*Wert nach Inflation (in heutiger Kaufkraft)</small>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ORIGINAL LOGIK (UNVERÄNDERT)
+function calc() {
+    const price = parseFloat(document.getElementById('price').value);
+    const equity = parseFloat(document.getElementById('equity').value);
+    const intRate = parseFloat(document.getElementById('interest').value) / 100 / 12;
+    const years = parseInt(document.getElementById('years').value);
+    const costs = price * (parseFloat(document.getElementById('costs').value) / 100);
+    const extraP = parseFloat(document.getElementById('extra').value) / 100;
+
+    const loan = (price + costs) - equity;
+    const months = years * 12;
+
+    const rate = loan * (intRate * Math.pow(1 + intRate, months)) / (Math.pow(1 + intRate, months) - 1);        
+    let balance = loan;
+    let totalInt = 0;
+    for(let i = 1; i <= months; i++) {
+        let mInt = balance * intRate;
+        totalInt += mInt;
+        balance -= (rate - mInt);
+        if(i % 12 === 0) balance -= (balance * extraP); 
+        if(balance < 0) balance = 0;
+    }
+
+    document.getElementById('outLoan').innerText = Math.round(loan).toLocaleString() + " €";
+    document.getElementById('outRate').innerText = rate.toFixed(2).toLocaleString() + " €";
+    document.getElementById('outInt').innerText = Math.round(totalInt).toLocaleString() + " €";
+    document.getElementById('outRest').innerText = Math.round(balance).toLocaleString() + " €";
+}
+
+// INVESTMENT LOGIK (NEU)
+function calcInvestment() {
+    const start = parseFloat(document.getElementById('invStart').value) || 0;
+    const monthly = parseFloat(document.getElementById('invMonthly').value) || 0;
+    const returnYear = parseFloat(

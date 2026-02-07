@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Obsession Academy - Fact-Based 2026 Trading</title>
+<style>
+:root { --gold: #f2a900; --warm: #ff4e50; --bg: #0d0d0d; --neon: #39ff14; }
+body { background: radial-gradient(circle, #221110, #000); color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+.card { background: rgba(15,15,15,0.98); border: 1px solid var(--gold); border-radius: 20px; padding: 35px; width: 550px; box-shadow: 0 0 60px rgba(255,78,80,0.1); }
+h2 { text-align: center; color: var(--gold); letter-spacing: 3px; text-transform: uppercase; margin-top: 0; }
+.input-row { display: flex; gap: 15px; margin-bottom: 20px; }
+.input-grp { flex: 1; }
+label { display: block; font-size: 11px; color: var(--warm); margin-bottom: 6px; font-weight: bold; text-transform: uppercase; }
+input, select { width: 100%; padding: 12px; background: #1a1a1a; border: 1px solid #333; color: white; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+table { width: 100%; border-collapse: collapse; margin-top: 15px; border: 1px solid #222; }
+th { font-size: 11px; background: #1a1a1a; color: #888; padding: 12px; text-align: left; }
+td { padding: 14px 12px; border-bottom: 1px solid #222; font-size: 14px; }
+.coin-icon-box { display: flex; align-items: center; gap: 12px; font-weight: bold; }
+.icon { width: 24px; height: 24px; }
+.result-panel { margin-top: 25px; padding: 20px; border-radius: 12px; background: linear-gradient(180deg, #111, #000); border: 1px solid #333; text-align: center; }
+.be-price { font-size: 34px; color: var(--neon); font-weight: bold; text-shadow: 0 0 10px rgba(57, 255, 20, 0.3); }
+.lesson-note { font-size: 11px; color: #666; margin-top: 15px; font-style: italic; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<div class="card">
+<h2>Obsession Academy</h2>
+<div class="input-row">
+<div class="input-grp">
+<label>Trade Size ($)</label>
+<input type="number" id="amt" value="70000" oninput="calc()">
+</div>
+<div class="input-grp">
+<label>Platform (2026 Facts)</label>
+<select id="plat" onchange="calc()">
+<option value="coinbase_maker">Coinbase Adv. (Maker)</option>
+<option value="coinbase_taker">Coinbase Adv. (Taker)</option>
+<option value="bybit">Bybit Spot</option>
+<option value="binance">Binance (No BNB)</option>
+<option value="deribit">Deribit Spot</option>
+</select>
+</div>
+</div>
+
+<table>
+<thead>
+<tr><th>Asset</th><th>Fee Rate</th><th>Avg. Spread</th></tr>
+</thead>
+<tbody>
+<tr>
+<td class="coin-icon-box"><img src="https://cryptologos.cc/logos/bitcoin-btc-logo.png" class="icon"> BTC</td>
+<td id="f-rate">0.15%</td><td id="s-val">$2.00</td>
+</tr>
+<tr>
+<td class="coin-icon-box"><img src="https://cryptologos.cc/logos/ethereum-eth-logo.png" class="icon"> ETH</td>
+<td colspan="2" style="text-align:center; color:var(--gold)">Target: To the moon...</td>
+</tr>
+<tr>
+<td class="coin-icon-box"><img src="https://cryptologos.cc/logos/xrp-xrp-logo.png" class="icon"> XRP</td>
+<td colspan="2" style="text-align:center; color:var(--gold)">Target: To the moon...</td>
+</tr>
+<tr>
+<td class="coin-icon-box"><img src="https://cryptologos.cc/logos/bnb-bnb-logo.png" class="icon"> BNB</td>
+<td colspan="2" style="text-align:center; color:var(--gold)">Target: To the moon...</td>
+</tr>
+</tbody>
+</table>
+
+<div class="result-panel">
+<label>Total Entry Cost (Fee + Spread)</label>
+<div id="cost" style="color:var(--warm); font-size: 20px; margin-bottom: 10px;">$107.00</div>
+<label>True Break-Even Price</label>
+<span class="be-price" id="be">$70,107.00</span>
+</div>
+
+<div class="lesson-note">
+<b>Teaching Point:</b> Notice how Coinbase Maker (Limit Order) is often cheaper than Bybit because the institutional spread is lower ($2 vs $12). Always use Limit orders to save on fees.
+</div>
+</div>
+
+<script>
+// Fact-Based 2026 Database for $70k volume
+const facts = {
+coinbase_maker: { f: 0.0015, s: 2 },
+coinbase_taker: { f: 0.0025, s: 2 },
+bybit: { f: 0.001, s: 12 },
+binance: { f: 0.001, s: 5 },
+deribit: { f: 0, s: 25 }
+};
+
+function calc() {
+const p = document.getElementById('plat').value;
+const amt = parseFloat(document.getElementById('amt').value) || 0;
+const entry = 70000;
+const feeAmt = amt * facts[p].f;
+const spread = facts[p].s;
+const totalCost = feeAmt + spread;
+const units = amt / entry;
+const breakEven = entry + (totalCost / units);
+
+document.getElementById('f-rate').innerText = (facts[p].f * 100).toFixed(2) + "%";
+document.getElementById('s-val').innerText = "$" + spread.toFixed(2);
+document.getElementById('cost').innerText = "$" + totalCost.toLocaleString(undefined, {minimumFractionDigits: 2});
+document.getElementById('be').innerText = "$" + breakEven.toLocaleString(undefined, {minimumFractionDigits: 2});
+}
+calc();
+</script>
+</body>
+</html>
+
+

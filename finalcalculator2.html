@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsession Trading Academy - Mortgage Calculator</title>
+    <style>
+        :root {
+            --bg: #0b061a;
+            --card: #150f2d;
+            --accent: #7b4dff;
+            --btc-gold: #f7931a;
+            --text: #ffffff;
+            --highlight: #00f2ff;
+            --green: #2ecc71;
+            --red: #ff4d4d;
+            --label-color: #d1b3ff; /* Hellere Farbe für bessere Lesbarkeit im Video */
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 5% 5%, rgba(247, 147, 26, 0.1) 0%, transparent 30%);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            margin: 0;
+        }
+
+        .container {
+            background-color: var(--card);
+            padding: 30px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 850px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+        }
+
+        .top-icons { position: absolute; top: 25px; right: 35px; font-size: 28px; }
+
+        .header { text-align: center; margin-bottom: 35px; border-bottom: 2px solid var(--accent); padding-bottom: 15px; }
+        .header h1 { color: #d1b3ff; margin: 0; font-size: 2rem; text-transform: uppercase; letter-spacing: 2px; }
+        .header h2 { color: var(--btc-gold); font-size: 1.1rem; margin-top: 5px; }
+
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        
+        .input-group { display: flex; flex-direction: column; }
+        
+        /* OPTIMIERT FÜR VIDEO: Größere und markierte Labels */
+        label { 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            margin-bottom: 8px; 
+            color: var(--label-color); 
+            text-shadow: 0px 0px 8px rgba(209, 179, 255, 0.3);
+        }
+
+        input { 
+            padding: 14px; 
+            border-radius: 10px; 
+            border: none; 
+            background: #ffffff; 
+            color: #150f2d; 
+            font-size: 1.2rem; 
+            font-weight: bold;
+        }
+
+        button {
+            grid-column: span 2;
+            background: linear-gradient(135deg, var(--accent), #5a2ed1);
+            color: white; padding: 18px; border: none; border-radius: 12px;
+            cursor: pointer; font-weight: bold; font-size: 1.2rem;
+            text-transform: uppercase; transition: all 0.3s ease;
+        }
+        button:hover { transform: scale(1.01); box-shadow: 0 5px 15px rgba(123, 77, 255, 0.4); }
+
+        .results {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 25px; border-radius: 15px;
+            border-left: 5px solid var(--btc-gold);
+        }
+
+        .res-row { 
+            display: flex; justify-content: space-between; 
+            padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 1.15rem;
+        }
+
+        .val { color: var(--highlight); font-weight: bold; }
+        .val-total { color: var(--green); font-weight: 900; }
+        .val-rest { color: var(--red); font-weight: bold; }
+        .btc-icon { color: var(--btc-gold); margin-right: 8px; font-weight: bold; }
+        
+        .bottom-icons { 
+            text-align: center; margin-top: 25px; font-size: 45px; 
+            filter: drop-shadow(0 0 10px var(--btc-gold));
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="top-icons">🏠 🚗</div>
+    <div class="header">
+        <h1>Obsession Trading Academy</h1>
+        <h2>Mortgage Calculator / Hypothekenrechner</h2>
+    </div>
+
+    <div class="grid">
+        <div class="input-group">
+            <label>Purchase Price / Kaufpreis (€)</label>
+            <input type="number" id="price" value="500000">
+        </div>
+        <div class="input-group">
+            <label>Equity / Eigenkapital (€)</label>
+            <input type="number" id="equity" value="80000">
+        </div>
+        <div class="input-group">
+            <label>Interest / Zins (% p.a.)</label>
+            <input type="number" id="interest" step="0.01" value="3.5">
+        </div>
+        <div class="input-group">
+            <label>Max Duration / Wunsch-Laufzeit (Years)</label>
+            <input type="number" id="years" value="30">
+        </div>
+        <div class="input-group">
+            <label>Extra Costs / Nebenkosten (%)</label>
+            <input type="number" id="costs" value="10">
+        </div>
+        <div class="input-group">
+            <label>Sondertilgung / Extra Paym. (% p.a.)</label>
+            <input type="number" id="extra" value="2">
+        </div>
+
+        <button onclick="calc()">Berechnen / Calculate</button>
+    </div>
+
+    <div class="results">
+        <div class="res-row">
+            <span><span class="btc-icon">₿</span> Loan Amount / Kreditsumme:</span>
+            <span class="val" id="outLoan">0 €</span>
+        </div>
+        <div class="res-row">
+            <span>Monthly Payment / Monatliche Rate:</span>
+            <span class="val" id="outRate">0 €</span>
+        </div>
+        <div class="res-row">
+            <span>Total Interest / Gesamte Zinsen:</span>
+            <span class="val" id="outInt">0 €</span>
+        </div>
+        <div class="res-row" style="background: rgba(46, 204, 113, 0.1); border-radius: 5px; padding: 12px 10px;">
+            <span>Total Paid / Gesamt bezahlt:</span>
+            <span class="val-total" id="outTotal">0 €</span>
+        </div>
+        <div class="res-row">
+            <span>Remaining Debt / Restbetrag:</span>
+            <span class="val-rest" id="outRest">0 €</span>
+        </div>
+    </div>
+
+    <div class="bottom-icons">🏠 ₿ 🚗</div>
+</div>
+
+<script>
+function calc() {
+    const price = parseFloat(document.getElementById('price').value) || 0;
+    const equity = parseFloat(document.getElementById('equity').value) || 0;
+    const intRateYear = parseFloat(document.getElementById('interest').value) / 100;
+    const intRateMonth = intRateYear / 12;
+    const years = parseInt(document.getElementById('years').value) || 1;
+    const costs = price * (parseFloat(document.getElementById('costs').value) / 100);
+    const extraP = parseFloat(document.getElementById('extra').value) / 100;
+
+    const loan = (price + costs) - equity;
+    const months = years * 12;
+
+    if (loan <= 0) return;
+
+    const rate = loan * (intRateMonth * Math.pow(1 + intRateMonth, months)) / (Math.pow(1 + intRateMonth, months) - 1);
+    
+    let balance = loan;
+    let totalInterest = 0;
+    let totalPaid = 0;
+
+    for(let i = 1; i <= months; i++) {
+        let mInterest = balance * intRateMonth;
+        totalInterest += mInterest;
+        let principal = rate - mInterest;
+        balance -= principal;
+        totalPaid += rate;
+
+        if(i % 12 === 0 && balance > 0) {
+            let sondi = balance * extraP;
+            balance -= sondi;
+            totalPaid += sondi;
+        }
+        if(balance < 0) balance = 0;
+    }
+
+    document.getElementById('outLoan').innerText = Math.round(loan).toLocaleString('de-DE') + " €";
+    document.getElementById('outRate').innerText = rate.toFixed(2).toLocaleString('de-DE') + " €";
+    document.getElementById('outInt').innerText = Math.round(totalInterest).toLocaleString('de-DE') + " €";
+    document.getElementById('outTotal').innerText = Math.round(totalPaid).toLocaleString('de-DE') + " €";
+    document.getElementById('outRest').innerText = Math.round(balance).toLocaleString('de-DE') + " €";
+}
+calc();
+</script>
+
+</body>
+</html>
