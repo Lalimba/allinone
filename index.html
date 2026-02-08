@@ -81,41 +81,50 @@
     </style>
 </head>
 <body>
+    <div style="background: #FFD700; color: #000; padding: 10px 0; font-weight: bold; overflow: hidden; white-space: nowrap;">
+        <div style="display: inline-block; animation: scroll 20s linear infinite;">
+            🚀 BTC: $94,231 | 💎 ETH: $2,642 | 🔶 BNB: $612 | 📈 MARKET CAP: 3.2T | 🔥 OBSESSION ACADEMY IS LIVE! &nbsp;&nbsp;&nbsp;&nbsp; 🚀 BTC: $94,231 | 💎 ETH: $2,642 | 🔶 BNB: $612 
+        </div>
+    </div>
+
+    <style>
+        @keyframes scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+    </style>
+
     <div class="dashboard">
         <h1>OBSESSION ACADEMY</h1>
+        
+        <div style="background: rgba(255,215,0,0.1); border: 1px solid #FFD700; border-radius: 8px; padding: 15px; margin-bottom: 30px; text-align: center;">
+            <strong style="color: #FFD700;">💡 PRO TIP:</strong> 
+            <span id="daily-tip">Loading student wisdom...</span>
+        </div>
+
         <p class="subtitle">PREMIUM TRADING TOOLS & CALCULATORS</p>
         
         <ul>
-            <li>
-                <img class="token-icon" src="https://cryptologos.cc/logos/bitcoin-btc-logo.svg">
-                <a href="breakeven.html">📊 Breakeven Calculator</a>
-            </li>
-
-            <li>
-                <img class="token-icon" src="https://cryptologos.cc/logos/ethereum-eth-logo.svg">
-                <a href="allinone.html">💰 Maker vs Taker Fee Tool</a>
-            </li>
-
-            <li>
-                <img class="token-icon" src="https://cryptologos.cc/logos/binance-coin-bnb-logo.svg">
-                <a href="bot_trading_simulator.html">⚖️ Position Sizing Script</a>
-            </li>
-
-            <li>
-                <img class="token-icon" src="https://cryptologos.cc/logos/xrp-xrp-logo.svg">
-                <a href="factbased.html">⚖️ Position Sizing Script (Fact Based)</a>
-            </li>
-
-            <li>
-                <img class="token-icon" src="https://cryptologos.cc/logos/tether-usdt-logo.svg">
-                <a href="tradingbot.html">💰 Maker vs Taker Fee Tool (Bot)</a>
-            </li>
-
-            <li>
-                <div class="emoji-box">📑</div>
-                <a href="glossary.html">Trading Glossary</a>
-            </li>
+            <li><img class="token-icon" src="https://cryptologos.cc/logos/bitcoin-btc-logo.svg"><a href="breakeven.html">📊 Breakeven Calculator</a></li>
+            <li><img class="token-icon" src="https://cryptologos.cc/logos/ethereum-eth-logo.svg"><a href="allinone.html">💰 Maker vs Taker Fee Tool</a></li>
+            <li><img class="token-icon" src="https://cryptologos.cc/logos/binance-coin-bnb-logo.svg"><a href="bot_trading_simulator.html">⚖️ Position Sizing Script</a></li>
+            <li><img class="token-icon" src="https://cryptologos.cc/logos/xrp-xrp-logo.svg"><a href="factbased.html">⚖️ Position Sizing (Fact Based)</a></li>
+            <li><img class="token-icon" src="https://cryptologos.cc/logos/tether-usdt-logo.svg"><a href="tradingbot.html">🤖 Trading Bot Tools</a></li>
+            <li><div class="emoji-box">📑</div><a href="glossary.html">Trading Glossary</a></li>
         </ul>
     </div>
+
+    <script>
+        const tips = [
+            "Always set your stop-loss before you enter the trade.",
+            "The trend is your friend until the end.",
+            "Risk management is more important than your strategy.",
+            "Don't trade with money you can't afford to lose.",
+            "Patience pays. Wait for the setup, don't chase the candle."
+        ];
+        
+        // Pick a random tip every time they visit
+        document.getElementById('daily-tip').innerText = tips[Math.floor(Math.random() * tips.length)];
+    </script>
 </body>
 </html>
