@@ -1,0 +1,214 @@
+"""
+Multi-Exchange Liquidation Heatmap Dashboard
+REST API version: Binance, Bybit, OKX, Deribit
+Python 3.14 + Streamlit compatible
+"""
+
+import time
+from datetime import datetime, timezone
+from collections import deque
+import threading
+import requests
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+
+# ------------------------------
+# Config
+# ------------------------------
+RECENT_SECONDS = 300
+_lock = threading.Lock()
+liquidations = deque()  # stores dicts: ts, exchange, symbol, price, qty, side
+
+# API endpoints
+BINANCE_API = "https://fapi.binance.com/fapi/v1/allForceOrders"
+BYBIT_API = "https://api.bybit.com/v5/market/liquidation"
+OKX_API = "https://www.okx.com/api/v5/public/liquidation-archive"
+DERIBIT_API = "https://www.deribit.com/api/v2/public/get_liquidations"
+
+# ------------------------------
+# Helper function
+# ------------------------------
+def append_liq(record: dict):
+    with _lock:
+        liquidations.append(record)
+        cutoff = time.time() - RECENT_SECONDS
+        while liquidations and liquidations[0]["ts"] < cutoff:
+            liquidations.popleft()
+
+# ------------------------------
+# Fetch functions
+# ------------------------------
+def fetch_binance(symbols):
+    try:
+        r = requests.get(BINANCE_API, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        for item in data:
+            symbol = item.get("symbol", "").upper()
+            if symbol not in symbols:
+                continue
+            side = item.get("side", "").upper()
+            price = float(item.get("price", 0))
+            qty = float(item.get("origQty", 0))
+            ts = int(item.get("time", time.time()*1000)) / 1000.0
+            rec = {"ts": ts, "t": datetime.fromtimestamp(ts, timezone.utc),
+                   "exchange": "Binance", "symbol": symbol,
+                   "price": price, "qty": qty, "side": side}
+            append_liq(rec)
+    except Exception as e:
+        print("Binance fetch error:", e)
+
+def fetch_bybit(symbols):
+    try:
+        for s in symbols:
+            params = {"symbol": s.upper(), "limit": 50}
+            r = requests.get(BYBIT_API, params=params, timeout=10)
+            r.raise_for_status()
+            data = r.json().get("result", {}).get("list", [])
+            for item in data:
+                symbol = item.get("symbol", "").upper()
+                side = item.get("side", "").upper()
+                price = float(item.get("price", 0))
+                qty = float(item.get("qty", 0))
+                ts = int(item.get("time", time.time()*1000)) / 1000.0
+                rec = {"ts": ts, "t": datetime.fromtimestamp(ts, timezone.utc),
+                       "exchange": "Bybit", "symbol": symbol,
+                       "price": price, "qty": qty, "side": side}
+                append_liq(rec)
+    except Exception as e:
+        print("Bybit fetch error:", e)
+
+def fetch_okx(symbols):
+    try:
+        for s in symbols:
+            params = {"instId": s.upper(), "limit": "50"}
+            r = requests.get(OKX_API, params=params, timeout=10)
+            r.raise_for_status()
+            data = r.json().get("data", [])
+            for item in data:
+                symbol = item.get("instId", "").upper()
+                side = item.get("side", "").upper()
+                price = float(item.get("px", 0))
+                qty = float(item.get("sz", 0))
+                ts = int(item.get("ts", time.time()*1000)) / 1000.0
+                rec = {"ts": ts, "t": datetime.fromtimestamp(ts, timezone.utc),
+                       "exchange": "OKX", "symbol": symbol,
+                       "price": price, "qty": qty, "side": side}
+                append_liq(rec)
+    except Exception as e:
+        print("OKX fetch error:", e)
+
+def fetch_deribit(symbols):
+    try:
+        for s in symbols:
+            params = {"instrument_name": s.upper(), "count": 50}
+            r = requests.get(DERIBIT_API, params=params, timeout=10)
+            r.raise_for_status()
+            data = r.json().get("result", [])
+            for item in data:
+                symbol = item.get("instrument_name", "").upper()
+                side = item.get("direction", "").upper()
+                price = float(item.get("price", 0))
+                qty = float(item.get("amount", 0))
+                ts = int(item.get("timestamp", time.time()*1000)) / 1000.0
+                rec = {"ts": ts, "t": datetime.fromtimestamp(ts, timezone.utc),
+                       "exchange": "Deribit", "symbol": symbol,
+                       "price": price, "qty": qty, "side": side}
+                append_liq(rec)
+    except Exception as e:
+        print("Deribit fetch error:", e)
+
+# ------------------------------
+# Build heatmap
+# ------------------------------
+def build_heatmap_df(price_bins=40, group_by="symbol"):
+    with _lock:
+        rows = list(liquidations)
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0)
+    df["qty"] = pd.to_numeric(df["qty"], errors="coerce").fillna(0)
+    min_p = df["price"].min()
+    max_p = df["price"].max()
+    if min_p == max_p:
+        max_p = min_p * 1.01 + 1
+    bins = pd.interval_range(start=min_p, end=max_p, periods=price_bins)
+    df["price_bin"] = pd.cut(df["price"], bins=bins)
+    if group_by == "symbol":
+        pivot = df.groupby(["price_bin", "symbol"])["qty"].sum().reset_index()
+        piv = pivot.pivot(index="price_bin", columns="symbol", values="qty").fillna(0)
+    else:
+        pivot = df.groupby(["price_bin", "exchange"])["qty"].sum().reset_index()
+        piv = pivot.pivot(index="price_bin", columns="exchange", values="qty").fillna(0)
+    piv.index = [f"{i.left:.2f}-{i.right:.2f}" for i in piv.index]
+    return piv
+
+# ------------------------------
+# Background fetch loop
+# ------------------------------
+def start_fetch_loop(bin_syms, byb_syms, okx_syms, der_syms, interval=5):
+    def loop():
+        while True:
+            fetch_binance(bin_syms)
+            fetch_bybit(byb_syms)
+            fetch_okx(okx_syms)
+            fetch_deribit(der_syms)
+            time.sleep(interval)
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+
+# ------------------------------
+# Streamlit UI
+# ------------------------------
+st.set_page_config(page_title="Multi-Exchange Liquidation Heatmap", layout="wide")
+st.title("📉 Multi-Exchange Liquidation Heatmap")
+
+with st.sidebar:
+    st.header("Settings")
+    bin_syms = st.text_input("Binance symbols", "ETHUSDT,BTCUSDT").split(",")
+    byb_syms = st.text_input("Bybit symbols", "ETHUSDT,BTCUSDT").split(",")
+    okx_syms = st.text_input("OKX symbols", "ETH-USDT,BTC-USDT").split(",")
+    der_syms = st.text_input("Deribit symbols", "ETH-PERPETUAL,BTC-PERPETUAL").split(",")
+    group_by = st.selectbox("Group by", ["symbol", "exchange"])
+    price_bins = st.slider("Price bins", 10, 100, 40)
+    refresh = st.slider("Refresh (sec)", 1, 10, 3)
+
+bin_syms = [s.strip().upper() for s in bin_syms if s.strip()]
+byb_syms = [s.strip().upper() for s in byb_syms if s.strip()]
+okx_syms = [s.strip().upper() for s in okx_syms if s.strip()]
+der_syms = [s.strip().upper() for s in der_syms if s.strip()]
+
+if "started" not in st.session_state:
+    st.session_state.started = True
+    start_fetch_loop(bin_syms, byb_syms, okx_syms, der_syms, interval=refresh)
+    st.sidebar.write("✅ Fetch loop started")
+
+placeholder_map = st.empty()
+placeholder_table = st.empty()
+
+while True:
+    piv = build_heatmap_df(price_bins, group_by)
+    if piv.empty:
+        placeholder_map.info("Waiting for liquidation data...")
+    else:
+        fig = px.imshow(
+            piv.values[::-1],
+            x=list(piv.columns),
+            y=list(piv.index[::-1]),
+            labels=dict(x=group_by, y="Price range", color="Qty"),
+            aspect="auto",
+        )
+        fig.update_layout(height=700)
+        placeholder_map.plotly_chart(fig, use_container_width=True)
+
+        with _lock:
+            recent = list(liquidations)[-200:]
+        df_recent = pd.DataFrame(recent)
+        if not df_recent.empty:
+            df_recent = df_recent.sort_values("ts", ascending=False)
+            placeholder_table.dataframe(df_recent[["t", "exchange", "symbol", "price", "qty", "side"]])
+
+    time.sleep(refresh)
+v
