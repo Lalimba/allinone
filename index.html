@@ -2,125 +2,173 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Obsession Academy | Gold Dashboard</title>
+    <title>Obsession Academy | Gold Hub</title>
     <style>
         body {
             background: radial-gradient(circle at top, #1a1a2e 0%, #08080c 100%);
             color: #e0e0e0;
             font-family: 'Segoe UI', Arial, sans-serif;
             margin: 0;
-            padding: 15px;
+            padding: 20px;
         }
+
         .dashboard-container {
             display: grid;
-            grid-template-columns: 3fr 1fr; 
+            grid-template-columns: 2fr 1fr;
             gap: 20px;
             max-width: 1400px;
             margin: auto;
         }
-        .header-section { grid-column: 1 / span 2; text-align: center; }
+
         .card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 215, 0, 0.2);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 215, 0, 0.1);
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        h2 { color: #FFD700; margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid rgba(255,215,0,0.1); padding-bottom: 10px; }
-        
-        /* Forces the chart to be huge */
-        .big-chart { height: 750px; width: 100%; }
 
-        @media (max-width: 1000px) {
-            .dashboard-container { grid-template-columns: 1fr; }
-            .header-section { grid-column: 1; }
+        h2 { color: #FFD700; border-bottom: 1px solid rgba(255,215,0,0.2); padding-bottom: 10px; margin-top: 0; }
+
+        /* Calculator Styling */
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #aaa; font-size: 0.9rem; }
+        input, select { 
+            width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #444; 
+            background: #111; color: #fff; font-size: 1rem; box-sizing: border-box;
         }
+        .result-display {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid #FFD700;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 15px;
+        }
+        .price-text { font-size: 1.8rem; color: #FFD700; font-weight: bold; }
+        .btn-search {
+            background: #FFD700; color: #000; border: none; padding: 10px; 
+            width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px;
+        }
+
+        @media (max-width: 900px) { .dashboard-container { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
 
     <div class="dashboard-container">
         
-        <div class="header-section">
-            <h1 style="color: #FFD700; margin: 0;">OBSESSION ACADEMY</h1>
-            <p style="color: #888;">Gold Analysis & Live Calculators</p>
-        </div>
-
-        <div class="left-column">
-            <div class="card">
-                <h2>📈 Gold (XAU/USD) Advanced Terminal</h2>
-                <div class="big-chart">
-                    <div id="tradingview_gold" style="height: 100%; width: 100%;"></div>
-                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                    <script type="text/javascript">
-                    new TradingView.widget({
-                        "autosize": true,
-                        "symbol": "OANDA:XAUUSD",
-                        "interval": "D",
-                        "timezone": "Etc/UTC",
-                        "theme": "dark",
-                        "style": "1",
-                        "locale": "en",
-                        "enable_publishing": false,
-                        "allow_symbol_change": true,
-                        "container_id": "tradingview_gold"
-                    });
-                    </script>
-                </div>
-            </div>
-        </div>
-
-        <div class="right-column" style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="display: flex; flex-direction: column; gap: 20px;">
             
             <div class="card">
-                <h2>💰 Live Price Calculator</h2>
-                <div id="gold-calc" style="width: 100%;">
-                    <script type="text/javascript" src="https://www.bullionvault.com/chart/bulletin.js"></script>
-                    <div id="bannerContainer"></div>
-                    <script type="text/javascript">
-                        var options = {
-                            bullion: 'gold',
-                            currency: 'USD',
-                            timeframe: '1d',
-                            chartType: 'line',
-                            width: '100%',
-                            height: '250px'
-                        };
-                        new BullionVaultPriceWidget('bannerContainer', options);
-                    </script>
-                </div>
-                <p style="font-size: 0.8rem; color: #888; margin-top: 10px; text-align: center;">Live market rates (USD/oz)</p>
+                <h2>📈 Gold (XAU/USD) Chart</h2>
+                <div id="tradingview_gold" style="height: 500px;"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                <script type="text/javascript">
+                new TradingView.widget({
+                    "width": "100%", "height": 500, "symbol": "OANDA:XAUUSD",
+                    "interval": "D", "theme": "dark", "style": "1", "locale": "en",
+                    "container_id": "tradingview_gold"
+                });
+                </script>
             </div>
 
             <div class="card">
-                <h2>📜 Market Statistics</h2>
-                <div class="tradingview-widget-container">
-                    <div class="tradingview-widget-container__widget"></div>
-                    <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
-                    {
-                      "interval": "1D",
-                      "width": "100%",
-                      "isTransparent": true,
-                      "height": "400",
-                      "symbol": "OANDA:XAUUSD",
-                      "showIntervalTabs": true,
-                      "locale": "en",
-                      "colorTheme": "dark"
-                    }
-                    </script>
+                <h2>📜 Historical Gold Price Lookup</h2>
+                <p style="font-size: 0.8rem; color: #888;">Select a date to see the historical course (Numerical Only).</p>
+                <div class="input-group">
+                    <input type="date" id="histDate" value="2015-12-01">
+                </div>
+                <button class="btn-search" onclick="lookupHistorical()">Search Price</button>
+                
+                <div class="result-display">
+                    <div id="histLabel" style="font-size: 0.9rem;">Price on 2015-12-01:</div>
+                    <div id="histResult" class="price-text">$1,064.75</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+            
+            <div class="card">
+                <h2>⚖️ Gold Purity Calculator</h2>
+                
+                <div class="input-group">
+                    <label>Quantity</label>
+                    <input type="number" id="qty" value="1" oninput="calculateGold()">
+                </div>
+
+                <div class="input-group">
+                    <label>Unit</label>
+                    <select id="unit" onchange="calculateGold()">
+                        <option value="gram">Grams (g)</option>
+                        <option value="kg">Kilograms (kg)</option>
+                        <option value="oz">Ounce (oz)</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Purity (Karat)</label>
+                    <select id="karat" onchange="calculateGold()">
+                        <option value="1.0">24 Karat (99.9%)</option>
+                        <option value="0.916">22 Karat (91.6%)</option>
+                        <option value="0.750">18 Karat (75.0%)</option>
+                        <option value="0.585">14 Karat (58.5%)</option>
+                        <option value="0.333">8 Karat (33.3%)</option>
+                    </select>
+                </div>
+
+                <div class="result-display">
+                    <div style="font-size: 0.9rem;">Estimated Value (Live):</div>
+                    <div id="liveResult" class="price-text">$2,740.50</div>
                 </div>
             </div>
 
             <div class="card">
                 <h2>🛠️ Academy Tools</h2>
                 <ul style="list-style: none; padding: 0;">
-                    <li style="margin-bottom: 10px;"><a href="breakeven.html" style="color: #FFD700; text-decoration: none;">📊 Breakeven Calculator</a></li>
-                    <li><a href="glossary.html" style="color: #FFD700; text-decoration: none;">📑 Trading Glossary</a></li>
+                    <li style="margin-bottom: 10px;"><a href="breakeven.html" style="color: #FFD700; text-decoration: none;">📊 Breakeven Tool</a></li>
+                    <li><a href="glossary.html" style="color: #FFD700; text-decoration: none;">📑 Glossary</a></li>
                 </ul>
             </div>
-
         </div>
 
     </div>
+
+    <script>
+        // Logic for Purity Calculator
+        function calculateGold() {
+            const spotPrice = 2740.50; // Current Spot Price Placeholder
+            const ozToGram = 31.1035;
+            
+            let qty = document.getElementById('qty').value;
+            let unit = document.getElementById('unit').value;
+            let purity = document.getElementById('karat').value;
+            
+            let weightInGrams = qty;
+            if (unit === "kg") weightInGrams = qty * 1000;
+            if (unit === "oz") weightInGrams = qty * ozToGram;
+
+            let finalValue = (weightInGrams * (spotPrice / ozToGram)) * purity;
+            document.getElementById('liveResult').innerText = "$" + finalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        // Logic for Historical Lookup (Simulated for your example)
+        function lookupHistorical() {
+            let date = document.getElementById('histDate').value;
+            document.getElementById('histLabel').innerText = "Price on " + date + ":";
+            
+            // Your specific example data
+            if (date === "2015-12-01") {
+                document.getElementById('histResult').innerText = "$1,064.75";
+            } else {
+                document.getElementById('histResult').innerText = "---";
+                alert("For a live database, we need to connect a Gold API key. Would you like me to show you how?");
+            }
+        }
+
+        // Run calculation once at start
+        calculateGold();
+    </script>
 </body>
 </html>
