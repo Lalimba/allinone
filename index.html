@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Obsession Academy | Professional Dashboard</title>
+    <title>Obsession Academy | Gold & Trading Dashboard</title>
     <style>
         body {
             background: radial-gradient(circle at top, #1a1a2e 0%, #08080c 100%);
@@ -15,7 +15,7 @@
         /* 1. THE GRID SYSTEM */
         .dashboard-container {
             display: grid;
-            grid-template-columns: 2fr 1fr; /* Left side is twice as wide */
+            grid-template-columns: 2fr 1fr; /* Left side (Charts) is wider */
             grid-template-rows: auto auto;
             gap: 20px;
             max-width: 1400px;
@@ -28,7 +28,7 @@
             text-align: center;
         }
 
-        /* 3. MACRO ALERT (Flashing) */
+        /* 3. MACRO ALERT */
         .macro-alert {
             grid-column: 1 / span 2;
             background: rgba(255, 0, 0, 0.1);
@@ -47,6 +47,7 @@
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            overflow: hidden;
         }
 
         h2 { color: #FFD700; font-size: 1.2rem; margin-top: 0; border-bottom: 1px solid rgba(255,215,0,0.2); padding-bottom: 10px; }
@@ -59,7 +60,15 @@
 
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        /* Responsive: Stack vertically on mobile */
+        /* Calculator Styles */
+        .calc-frame {
+            width: 100%;
+            height: 400px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+        }
+
         @media (max-width: 900px) {
             .dashboard-container { grid-template-columns: 1fr; }
             .header-section, .macro-alert { grid-column: 1; }
@@ -72,47 +81,81 @@
         
         <div class="header-section">
             <h1 style="color: #FFD700; margin: 0;">OBSESSION ACADEMY</h1>
-            <p style="color: #888; margin-bottom: 20px;">Macro Analysis & Trading Command Center</p>
+            <p style="color: #888; margin-bottom: 20px;">Gold Analysis & Trading Command Center</p>
         </div>
 
         <div class="macro-alert">
             <div style="width: 10px; height: 10px; background: #ff4444; border-radius: 50%; margin-right: 15px; animation: blink 1s infinite;"></div>
-            <marquee style="color: #fff;">🏛️ FED MEETING ALERT: Watch Interest Rate Decision at 14:00 EST | US Inflation Data Pending...</marquee>
+            <marquee style="color: #fff;">🏛️ MARKET UPDATE: Gold (XAUUSD) testing key resistance levels | FOMC Minutes release approaching...</marquee>
         </div>
 
-        <div class="card">
-            <h2>🔥 Crypto Market Heatmap</h2>
-            <div style="height: 450px;">
-                <iframe src="https://www.tradingview.com/embed-widget/crypto-coins-heatmap/?locale=en#%7B%22colorTheme%22%3A%22dark%22%2C%22hasTopBar%22%3Afalse%2C%22isDataSetEnabled%22%3Atrue%2C%22isDetailsWindowEnabled%22%3Atrue%2C%22width%22%3A%22100%25%22%2C%22height%22%3A%22100%25%22%7D" 
-                style="width: 100%; height: 100%; border: none;"></iframe>
+        <div class="left-column" style="display: flex; flex-direction: column; gap: 20px;">
+            
+            <div class="card">
+                <h2>📈 Gold (XAU/USD) Real-Time Chart</h2>
+                <div style="height: 500px;">
+                    <div id="tradingview_gold" style="height: 100%;"></div>
+                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                    <script type="text/javascript">
+                    new TradingView.widget({
+                        "width": "100%",
+                        "height": "100%",
+                        "symbol": "OANDA:XAUUSD",
+                        "interval": "D",
+                        "timezone": "Etc/UTC",
+                        "theme": "dark",
+                        "style": "1",
+                        "locale": "en",
+                        "toolbar_bg": "#f1f3f6",
+                        "enable_publishing": false,
+                        "hide_side_toolbar": false,
+                        "allow_symbol_change": true,
+                        "container_id": "tradingview_gold"
+                    });
+                    </script>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📜 Historical Gold Price & Performance</h2>
+                <iframe src="https://goldbroker.com/widget/historical/XAU?height=400&currency=USD" scrolling="no" class="calc-frame"></iframe>
             </div>
         </div>
 
-        <div class="card">
-            <h2>🏛️ Economic Calendar</h2>
-            <div class="tradingview-widget-container">
-                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
-                { "colorTheme": "dark", "width": "100%", "height": "450", "importanceFilter": "0,1", "currencyFilter": "USD" }
-                </script>
+        <div class="right-column" style="display: flex; flex-direction: column; gap: 20px;">
+            
+            <div class="card">
+                <h2>💰 Live Gold Calculator</h2>
+                <iframe src="https://goldbroker.com/widget/live/XAU?currency=USD&height=320" scrolling="no" style="width: 100%; height: 320px; border:none;"></iframe>
+            </div>
+
+            <div class="card">
+                <h2>🏛️ Economic Calendar</h2>
+                <div class="tradingview-widget-container">
+                    <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+                    { "colorTheme": "dark", "width": "100%", "height": "400", "importanceFilter": "0,1", "currencyFilter": "USD" }
+                    </script>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🛠️ Trading Calculators</h2>
+                <ul>
+                    <li>📊 <a href="breakeven.html">Breakeven Calculator</a></li>
+                    <li>💰 <a href="allinone.html">Maker vs Taker Fee Tool</a></li>
+                    <li>⚖️ <a href="bot_trading_simulator.html">Position Sizing Script</a></li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>📖 Academy Lessons</h2>
+                <ul>
+                    <li>🟢 <a href="lesson1.html">Lesson 1: Macro Basics</a></li>
+                    <li>📑 <a href="glossary.html">Trading Glossary</a></li>
+                </ul>
             </div>
         </div>
 
-        <div class="card">
-            <h2>🛠️ Trading Calculators</h2>
-            <ul>
-                <li>📊 <a href="breakeven.html">Breakeven Calculator</a></li>
-                <li>💰 <a href="allinone.html">Maker vs Taker Fee Tool</a></li>
-                <li>⚖️ <a href="bot_trading_simulator.html">Position Sizing Script</a></li>
-            </ul>
-        </div>
-
-        <div class="card">
-            <h2>📖 Academy Lessons</h2>
-            <ul>
-                <li>🟢 <a href="lesson1.html">Lesson 1: Macro Basics</a></li>
-                <li>📑 <a href="glossary.html">Trading Glossary</a></li>
-            </ul>
-        </div>
-
-    </div> </body>
+    </div>
+</body>
 </html>
